@@ -1,0 +1,17 @@
+<div class="row-header-wrapper" ng-controller="rowTemplateController">
+    <ui-button id="btn-{{row.entity.$$hashKey}}" class="rowHeaderBtn"
+               ng-class="{'rowHeaderBtnSelected': row.isSelected}"
+               ng-click="rowHeaderClicked(row)"
+               ng-blur="rowHeaderLostFocus(row)">{{row.grid.rowHashMap['object:'+row.entity.$$hashKey].i+1}}
+    </ui-button>
+    <div class="popover" ng-show="row.clicked && row.isSelected" ng-style>
+        <div class="row-pointer-diamond"></div>
+        <ul class="row-header-ul">
+            <li ng-click="triggerAddRow(row)">Add Row Below</li>
+            <li ng-click="triggerDuplicate(row)">Duplicate</li>
+            <li ng-click="trigerDeleteRow(row)">Delete Row</li>
+        </ul>
+    </div>
+</div>
+
+

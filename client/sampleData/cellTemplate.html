@@ -1,0 +1,7 @@
+<div class="sdEditorHeaderCellWrapper" ng-controller="cellTemplateController">
+    <!--<div ng-click="cellClicked($event)">{{row.entity[col.field]}}</div>-->
+    <div class="ngCellText" ng-class="[(row.entity.dirtyCells && row.entity.dirtyCells.indexOf(col.field) !== -1) ? 'invalidCellEntry': 'noError', col.colIndex(),(row.entity.isHighLight && row.entity.isHighLight.indexOf(col.field) !== -1) ? 'invalid': 'noError']">
+
+        <span ng-cell-text class="sdCellTemplate">{{row.entity[col.field]}}</span>
+    </div>
+</div>

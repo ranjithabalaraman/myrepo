@@ -1,0 +1,35 @@
+<div ng-controller="sampleDataManagerController">
+    <ui-dialog id="gridDialog" cancel-text="Cancel" close-text="Ok" close-action="okBtnClicked()" cancel-action="sdCancelled()" on-open="openSDDialog()" class="editorDialog" modal="true">
+        <ui-tabs selected-tab="{{selectedTab}}" class="sdEditorTabstrip" tab-on="tab.active">
+            <ui-tab-option ng:repeat="entityTab in entityTabs" id="{{entityTab.name}}" title="{{entityTab.name}}" key="{{entityTab.name}}">
+
+                <div class="sdGridNErrorWrapper">
+
+                    <div ui-grid-auto-resize ui-grid-edit ui-grid-selection ui-grid-cellnav ui-grid="entityTab.gridOptions" class="sdEditorGrid" id="sdEditorGrid-id" ng-keyup="onKeyUp($event)">
+                    </div>
+                </div>
+            </ui-tab-option>
+        </ui-tabs>
+
+        <div class="sdErrorWrapper" ng-if="saveError" ng-style="errorWindowStyle" sdm-draggable co-ordinate="errorDialogCoordinates">
+            <div class="sdErrorTitleBar">
+                <div>Could Not Save</div>
+                <div class="sdErrorMinMaxCloseWrapper">
+                    <div class="maximizeButton" ng-click="maxMinError()" ng-style="maxMinBtnStyle"></div>
+                    <div class="sdErrorClose" ng-click="closeError()" ng-style=""></div>
+                </div>
+            </div>
+            <div class="sdErrorBody">
+                <div class="sdErrorGeneralMessage">
+                    <div class="sdErrorMessage">{{errorList.length}} problem(s) occurred during data validation.
+                    </div>
+                    <div class="errorToggle" ng-click="toggleErrorVisibility()">See Details [ <span>{{toggleSymbol}}</span> ]
+                    </div>
+                </div>
+                <div class="sdErrorList" ng-show="showErrors">
+                    <div ng-repeat="error in errorList track by $index" class="sdErrorItem" ng-mouseenter="highlight($event,error)" ng-mouseleave="removehighlight(error)">{{$index+1}} . {{error.text}}</div>
+                </div>
+            </div>
+        </div>
+    </ui-dialog>
+</div>
