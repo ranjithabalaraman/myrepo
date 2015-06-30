@@ -1,0 +1,26 @@
+{
+  "name": "norman-ui-catalog-manager-client",
+  "version": "0.9.80",
+  "description": "UICatalog Manager Client",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "licenses": [
+    {
+      "type": "Apache License, Version 2.0",
+      "url": "https://github.wdf.sap.corp/Norman/Norman/blob/master/LICENSE.txt"
+    }
+  ],
+  "publishConfig": {
+    "registry": "http://build-npm.mo.sap.corp:8080"
+  },
+  "peerDependencies": {
+    "norman-auth-client": "*",
+    "norman-shell-client": "*",
+    "norman-client-tp": "*"
+  },
+  "dependencies": {
+    "angular-filter": "0.5.1"
+  }
+}
