@@ -1,0 +1,70 @@
+{
+  "salesorder": {
+    "dEntityId" : "e1",
+    "dEntityName" : "SalesOrder",
+    "dProperties" : {
+      "id": {
+          "_id": "e1p1",
+          "name": "ID",
+          "isKey": true,
+          "isForeignKey": false,
+          "propertyType": "String"
+      },
+      "desc": {
+          "_id": "e1p2",
+          "name": "desc",
+          "isKey": false,
+          "isForeignKey": false,
+          "propertyType": "String"
+      },
+      "company": {
+          "_id": "e1p3",
+          "name": "Company",
+          "isKey": false,
+          "isForeignKey": false,
+          "propertyType": "String"
+      }
+    }
+  },
+  "salesorderitem" : {
+    "dEntityId" : "e2",
+    "dEntityName" : "SalesOrderItem",
+    "dProperties" : {
+      "id": {
+          "_id": "e2p1",
+          "name": "ID",
+          "isKey": true,
+          "isForeignKey": false,
+          "propertyType": "String"
+      },
+      "lineno": {
+          "_id": "e2p2",
+          "name": "lineNo",
+          "isKey": true,
+          "isForeignKey": false,
+          "propertyType": "String"
+      },
+      "qty": {
+          "_id": "e2p3",
+          "name": "Qty",
+          "isKey": false,
+          "isForeignKey": false,
+          "propertyType": "String"
+      },
+      "prodid": {
+          "_id": "e2p4",
+          "name": "ProdId",
+          "isKey": false,
+          "isForeignKey": false,
+          "propertyType": "String"
+      },
+      "salesorderid": {
+          "_id": "e2p5",
+          "name": "SalesOrderID",
+          "isKey": false,
+          "isForeignKey": true,
+          "propertyType": "String"
+      }
+    }
+  }
+}

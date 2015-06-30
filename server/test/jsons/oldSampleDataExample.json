@@ -1,0 +1,129 @@
+{
+    "_id" : ObjectId("54b11fb45adea1d833de169c"),
+    "name" : "newExcelInitial",
+    "dataModel" : {
+        "entities" : [
+            {
+                "lcaseName" : "order",
+                "navigationProperties" : [
+                    {
+                        "toEntity" : "OrderLine",
+                        "multiplicity" : true,
+                        "name" : "orderToLine"
+                    }
+                ],
+                "properties" : [
+                    {
+                        "propertyType" : "int",
+                        "isKey" : true,
+                        "name" : "id"
+                    },
+                    {
+                        "propertyType" : "string",
+                        "isKey" : false,
+                        "name" : "desc"
+                    },
+                    {
+                        "propertyType" : "date",
+                        "isKey" : false,
+                        "name" : "orderDate"
+                    }
+                ],
+                "media" : false,
+                "name" : "order"
+            },
+            {
+                "lcaseName" : "orderline",
+                "navigationProperties" : [],
+                "properties" : [
+                    {
+                        "propertyType" : "string",
+                        "isKey" : true,
+                        "name" : "orderId"
+                    },
+                    {
+                        "propertyType" : "String",
+                        "isKey" : true,
+                        "name" : "lineId"
+                    },
+                    {
+                        "scale" : 2,
+                        "precision" : 10,
+                        "maxLength" : 12,
+                        "propertyType" : "Decimal",
+                        "isKey" : false,
+                        "name" : "Quantity"
+                    }
+                ],
+                "media" : false,
+                "name" : "orderLine"
+            }
+        ],
+        "name" : "Data model1",
+        "tenant_id" : "tnt1"
+    },
+    "entities" : [ 
+        {
+            "properties" : [ 
+                {
+                    "orderDate" : ISODate("2014-12-14T00:00:00.000Z"),
+                    "desc" : "ZZZZZZ",
+                    "id" : 1
+                }, 
+                {
+                    "orderDate" : ISODate("2014-02-13T00:00:00.000Z"),
+                    "desc" : "XYZ",
+                    "id" : 2
+                }, 
+                {
+                    "orderDate" : ISODate("1699-12-31T18:30:00.000Z"),
+                    "desc" : "AVV",
+                    "id" : 3
+                }, 
+                {
+                    "orderDate" : ISODate("2014-12-13T00:00:00.000Z"),
+                    "desc" : "foe",
+                    "id" : 4
+                }, 
+                {
+                    "orderDate" : ISODate("2013-12-31T18:30:00.000Z"),
+                    "desc" : "new",
+                    "id" : 5
+                }
+            ],
+            "entityName" : "order"
+        }, 
+        {
+            "properties" : [ 
+                {
+                    "Quantity" : 999,
+                    "lineId" : 1,
+                    "orderId" : "1"
+                }, 
+                {
+                    "Quantity" : 30.14,
+                    "lineId" : 2,
+                    "orderId" : "1"
+                }, 
+                {
+                    "Quantity" : 1.23,
+                    "lineId" : 1,
+                    "orderId" : "2"
+                }, 
+                {
+                    "Quantity" : 22.43,
+                    "lineId" : 2,
+                    "orderId" : "2"
+                }, 
+                {
+                    "Quantity" : 3.22,
+                    "lineId" : 1,
+                    "orderId" : "3"
+                }
+            ],
+            "entityName" : "orderline"
+        }
+    ],
+    "type" : "private",
+    "__v" : 0
+}

@@ -1,0 +1,24 @@
+{
+  "name": "norman-sample-data-manager-server",
+  "version": "0.9.12",
+  "description": "Sample Data Server",
+  "repository": {
+    "type": "git",
+    "url": "https://github.wdf.sap.corp/Norman/SampleDataManager.git"
+  },
+  "main": "index.js",
+  "publishConfig": {
+    "registry": "http://build-npm.mo.sap.corp:8080/"
+  },
+  "dependencies": {},
+  "peerDependencies": {
+    "norman-auth-server": "*",
+    "norman-shared-workspace-server": "*",
+    "norman-common-server": "*",
+    "norman-promise": "*",
+    "norman-server-tp": "*",
+    "norman-data-modeler-server": "*"
+  },
+  "devDependencies": {},
+  "readmeFilename": "README.md"
+}
