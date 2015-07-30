@@ -1,644 +1,438 @@
 'use strict';
 
-var _ = require('norman-client-tp').lodash;
-var moment = require('norman-client-tp').moment;
+var commonServer = require('norman-common-server');
+var DataModel = require('./dataModelHelper');
+require('norman-server-tp');
+var _ = require('norman-server-tp').lodash;
+var serviceLogger = commonServer.logging.createLogger('sampleDataService');
+var prototypeHelper = require('./prototypeHelper');
 
-module.exports = [
-    '$rootScope',
-    '$scope',
-    '$http',
-    '$q',
-    '$timeout',
-    '$interval',
-    '$stateParams',
-    'sdm.sampleData',
-    'SampleDataHelper',
-    'uiError',
-    'uiDialogHelper',
-    function ($rootScope, $scope, $http, $q, $timeout, $interval, $stateParams, sampleDataFactoryService, SampleDataHelper, uiError, uiDialogHelper) {
-        var openPopUp = function (text) {
-            uiError.create({
-                content: text,
-                dismissOnTimeout: false,
-                dismissButton: true
-            });
-        };
-        /***ERROR HANDLING START***/
-        $scope.tab = {
-            active: ''
-        };
+var removeEntity = null;
 
-        function handleError(err) {
-            $scope.openToast(err.data);
-        }
+function throwErrors(errorList, pDefer) {
+    var validationError = {
+        text: 'Validation Failed',
+        errorList: errorList
+    };
+    pDefer.reject(validationError);
+    // throw validationError;
+}
 
-
-        var previousTab;
-
-        $scope.saveCurrentTab = function () {
-            previousTab = $scope.tab.active;
-        };
-        $scope.changeToPrevTab = function () {
-            function change() {
-                if ($scope.tab.active !== previousTab) {
-                    $scope.tab.active = previousTab;
-                }
-            }
-
-            $timeout(change, 200);
-        };
-
-        var changeTab = function (data) {
-            var tab = data.tab.tabNum;
-            var column = data.column;
-            var row = data.row;
-            var rowEntity = data.rowEntity;
-            var tabName = data.tab.tabName;
-            var grid = $scope.gridApis[$scope.tab.active].grid;
-            var localGridOptions = $scope.entityTabs[tab].gridOptions;
-            localGridOptions.enableCellEditOnFocus = false;
-            grid.api.cellNav.scrollTo(grid, $scope, rowEntity, null);
-            $scope.entityTabs[tab].activeErrorStyle = {
-                background: '#EF6152'
-            };
-            $scope.entityTabs[tab].inactiveErrorStyle = {
-                color: '#EF6152'
-            };
-            if (localGridOptions.data[row].isHighLight) {
-                localGridOptions.data[row].isHighLight.push(column);
-            }
-            else {
-                localGridOptions.data[row].isHighLight = [column];
-            }
-            if (!localGridOptions.data[row].errorText) {
-                localGridOptions.data[row].errorText = {};
-            }
-            localGridOptions.data[row].errorText[column] = data.text;
-            $scope.gridApis[tabName].selection.selectRow(data.rowEntity);
-            $scope.$emit('uiGridEventEndCellEdit');
-        };
-
-        var highlight = function (data) {
-            if (typeof data.tab !== 'undefined') {
-                $timeout(function () {
-                    changeTab(data);
-                }, 200);
-            }
-        };
-
-        var removehighlight = function (data) {
-            if (typeof data.tab !== 'undefined') {
-                var tab = data.tab.tabNum;
-                var row = data.row;
-                var localGridOptions = $scope.entityTabs[tab].gridOptions;
-                if (localGridOptions.data[row]) {
-                    delete localGridOptions.data[row].isHighLight;
-                    delete localGridOptions.data[row].errorText;
-                }
-            }
-        };
-
-        /***ERROR HANDLING END***/
-        function getForeignKeyName(foreignKeyId, entityId, idMap) {
-            var foreignKeyProp = idMap.foreignKeyMap[entityId][foreignKeyId];
-            var relationName = foreignKeyProp.relationName;
-            var sourceEntityId, targetEntityId, sourceEntityName, targetEntityName;
-            if (foreignKeyProp.multiplicity) {
-                sourceEntityId = idMap.foreignKeyMap[entityId][foreignKeyId].entityId;
-                sourceEntityName = idMap.entityMap[sourceEntityId].name;
-                targetEntityName = idMap.entityMap[entityId].name;
-            }
-            else {
-                targetEntityId = idMap.foreignKeyMap[entityId][foreignKeyId].entityId;
-                sourceEntityName = idMap.entityMap[entityId].name;
-                if (foreignKeyProp.selfNavigation) {
-                    targetEntityName = sourceEntityName;
-                }
-                else {
-                    targetEntityName = idMap.entityMap[targetEntityId].name;
-                }
-            }
-            return sourceEntityName + '.' + relationName + '.' + targetEntityName;
-        }
-
-        function rebaseSampleData(entityMeta, properties) {
-            var aDMProperties = _.map(entityMeta.properties, 'name');
-            var propName = null,
-                i;
-            var loopInPropArray = function (value, index) {
-                if ((value !== propName) && (value.toLowerCase() === propName.toLowerCase())) {
-                    properties[i][aDMProperties[index]] = properties[i][propName];
-                    delete properties[i][propName];
-                }
-            };
-            for (i = 0; i < properties.length; i++) {
-                for (propName in properties[i]) {
-                    aDMProperties.forEach(loopInPropArray);
-                }
-            }
-        }
-
-        $scope.$on('removeError', function (event, data) {
-            var findTabIndex = function (tabname, EntityTabs) {
-                var id = _.findIndex(EntityTabs, function (tab) {
-                    return tab.name.toLowerCase() === tabname.toLowerCase();
-                });
-                return id;
-            };
-            var tab = findTabIndex(data, $scope.entityTabs);
-            delete $scope.entityTabs[tab].inactiveErrorStyle;
-            delete $scope.entityTabs[tab].activeErrorStyle;
-        });
-        $scope.$on('SampleDataEditor', function (event, data) {
-            $rootScope.loadSDEDitor = false;
-            $scope.getEntityNavDataForProj(data.id, data.entityName);
-        });
-        $scope.$on('hidePop', function () {
-            $timeout(function () {
-                $scope.popupShow = {
-                    visibility: 'hidden'
-                };
-            }, 250);
-        });
-        $scope.$on('emitRow', function (event, emitRow) {
-            $scope.popupShow = {
-                visibility: 'hidden'
-            };
-            if (emitRow.row.isSelected) {
-                $timeout(function () {
-                    $scope.popupShow = {
-                        visibility: 'visible',
-                        top: emitRow.coordinates.y + 'px',
-                        left: '45px'
-                    };
-                }, 251);
-                $scope.emittedRow = emitRow.row;
-            }
-        });
-        var addLineListener = $scope.$on('addLine', function () {
-            $scope.triggerNewLine();
-        });
-
-        $scope.$on('$destroy', function () {
-            addLineListener(); // remove listener.
-        });
-
-        $scope.saveNcloseDialog = function () {
-            return function () {
-                $scope.triggerSave();
-            };
-        };
-
-        $scope.cleanDialog = function (id) {
-            angular.element(document.getElementById(id)).data().$isolateScope.dialogClean();
-        };
-
-        $scope.triggerModalClick = $scope.saveNcloseDialog('sd-grid-dialog-id');
-
-        $scope.openSDDialog = function () {
-            angular.element(document.getElementById('ui-dialog-modal-backdrop')).bind('click', $scope.triggerModalClick);
-        };
-        $scope.reOpenOnError = function () {
-            uiDialogHelper.open('sd-grid-dialog-id');
-        };
-
-        $scope.addHiddenCol = function (colName) {
-            if (!$scope.hiddenCols[$scope.tab.active]) {
-                $scope.hiddenCols[$scope.tab.active] = [];
-            }
-            $scope.hiddenCols[$scope.tab.active].push(colName);
-        };
-
-        $scope.checkarray = [];
-
-        function dateCheck(a) {
-            for (var i = 0; i < a.properties.length; i++) {
-                switch (a.properties[i].propertyType.toLowerCase()) {
-                    case 'time':
-                    case 'datetime':
-                        $scope.checkarray.push({
-                            name: a.properties[i].name,
-                            type: a.properties[i].propertyType.toLowerCase()
-                        });
-                }
-            }
-        }
-
-        function dateParse(data, opt) {
-            if ($scope.checkarray.length > 0) {
-                var checkArr = $scope.checkarray;
-                for (var i = 0; i < checkArr.length; i++) {
-                    for (var j = 0; j < data.properties.length; j++) {
-                        var parse = data.properties[j][checkArr[i].name];
-                        if (parse) {
-                            switch (opt) {
-                                case 'format':
-                                    if (checkArr[i].type === 'datetime') {
-                                        parse = moment(parse).format('YYYY-MM-DD');
-                                    } else if (checkArr[i].type === 'time') {
-                                        parse = moment.utc(parse).format('HH:mm:ss');
-                                    }
-                                    break;
-                                case 'parse':
-                                    var parseDate = (moment.parseZone(parse + ' UTC'))._d;
-                                    if ((parseDate instanceof Date) && isFinite(parseDate)) {
-                                        parse = parseDate;
-                                    }
-                                    break;
-                                default:
-
-                            }
-                            data.properties[j][checkArr[i].name] = parse;
-                        }
-                    }
-                }
-            }
-            return data;
-        }
-
-        var registerGridApi = function (gridApi) {
-            if (!$scope.gridApis) {
-                $scope.gridApis = {};
-            }
-            $scope.gridApis[gridApi.grid.options.tabName] = gridApi;
-            gridApi.selection.on.rowSelectionChanged($scope, function (row) {
-                if (row.isSelected) {
-                    $scope.lastSelectedRow = row;
-                }
-                $scope.gridApis[gridApi.grid.options.tabName] = gridApi;
-            });
-        };
-
-        function setHeaderCSS(grid, row, column) {
-            if (column.colDef.isForeignKey) {
-                return 'sd-foreign-key-class';
-            }
-        }
-
-        function dynamicColumnDefinition(entityMeta, idMap) {
-            var pkColDefItem = [];
-            var fkColDefItem = [];
-            var orderColDefItem = [];
-            for (var j = 0; j < entityMeta.properties.length; j++) {
-                var colDefItem = {
-                    name: entityMeta.properties[j].name,
-                    order: entityMeta.properties[j].order,
-                    isForeignKey: entityMeta.properties[j].isForeignKey,
-                    enableSorting: true,
-                    enableHiding: false,
-                    headerCellClass: setHeaderCSS,
-                    isPrimaryKey: entityMeta.properties[j].isKey,
-                    cellTemplate: 'resources/norman-prototype-editors-client/SampleDataManager/sampleData/cellTemplate.html',
-                    editableCellTemplate: 'resources/norman-prototype-editors-client/SampleDataManager/sampleData/editableCellTemplate.html',
-                    headerCellTemplate: 'resources/norman-prototype-editors-client/SampleDataManager/sampleData/columnHeader.html'
-                };
-                if (entityMeta.properties[j].calculated.inputProperties.length !== 0) {
-                    colDefItem.enableCellEdit = false;
-                }
-                if (entityMeta.properties[j].isForeignKey) {
-                    colDefItem.displayName = getForeignKeyName(entityMeta.properties[j]._id, entityMeta._id, idMap);
-                    fkColDefItem.push(colDefItem);
-                }
-                else if (entityMeta.properties[j].isKey) {
-                    colDefItem.displayName = colDefItem.name;
-                    pkColDefItem.push(colDefItem);
-                }
-                else {
-                    colDefItem.displayName = colDefItem.name;
-                    orderColDefItem.push(colDefItem);
-                }
-            }
-            // sort the non key properties
-            var sortedProperties = _.sortBy(orderColDefItem, 'order');
-            return pkColDefItem.concat(sortedProperties, fkColDefItem);
-        }
-
-        $scope.getEntityNavDataForProj = function (projId, entityName) {
-            var params = {
-                projId: projId,
-                entityName: entityName
-            };
-            $scope.saveError = false;
-
-            sampleDataFactoryService.getEntityNavDataForProj(params, function (response) {
-                    var sampleDataNav = JSON.parse(JSON.stringify(response));
-                    if (!sampleDataNav) {
-                        handleError(new Error('No Sample Data found'));
-                    }
-                    $scope.dataModelJson = sampleDataNav.dataModelJson;
-                    $scope.sampleData = sampleDataNav.sampleData;
-                    $scope.hiddenCols = {};
-                    $scope.navigationEntities = sampleDataNav.navigationEntities;
-                    // Lower case key value object pair
-                    var dataModelEntity = _.transform(sampleDataNav.dataModelJson.entities, function (result, entityObj) {
-                        result[entityObj.name.toLowerCase()] = entityObj;
-                        return result;
-                    });
-                    // Lower case key value object pair
-                    var sampleDataEntity = _.transform(sampleDataNav.sampleData.entities, function (result, entityObj) {
-                        result[entityObj.entityName.toLowerCase()] = entityObj;
-                        return result;
-                    }, {});
-
-                    var entityLCase = entityName.toLowerCase();
-                    var tableNamesL = [entityLCase];
-                    var entityTabs = [];
-                    for (var ind = 0; ind < sampleDataNav.navigationEntities.length; ind++) {
-                        tableNamesL.push(sampleDataNav.navigationEntities[ind].entityName.toLowerCase());
-                    }
-                    $scope.checkarray = [];
-                    for (var i = 0; i < tableNamesL.length; i++) {
-                        var entityMeta = dataModelEntity[tableNamesL[i]];
-                        var entityData = sampleDataEntity[tableNamesL[i]];
-                        dateCheck(entityMeta);
-                        if ($scope.checkarray.length > 0) {
-                            entityData = dateParse(entityData, 'format');
-                        }
-                        rebaseSampleData(entityMeta, entityData.properties);
-                        var entityTab = {
-                            hasError: true,
-                            name: entityData.entityName,
-                            gridOptions: {
-                                data: entityData.properties,
-                                dataModel: sampleDataNav.dataModelJson,
-                                rowHeight: 30,
-                                columnDefs: [],
-                                excludeProperties: ['dirtyCells'],
-                                enableHorizontalScrollbar: 0,
-                                enableVerticalScrollbar: 2,
-                                enableCellSelection: true,
-                                enableCellEditOnFocus: true,
-                                enableCellEdit: true,
-                                enableFiltering: true,
-                                tabName: entityData.entityName,
-                                onRegisterApi: registerGridApi,
-                                virtualizationThreshold: 2000,
-                                scrollThreshold: 10,
-                                minRowsToShow: 18,
-                                enableRowHeaderSelection: false
-                            }
-                        };
-                        if (i === 0) {
-                            entityTab.primaryTable = true;
-                        } else {
-                            entityTab.primaryTable = false;
-                        }
-                        entityTab.gridOptions.columnDefs.push({
-                            name: '+',
-                            width: 30,
-                            isForeignKey: false,
-                            enableSorting: false,
-                            isPrimaryKey: false,
-                            isRowHeader: true,
-                            enableCellEdit: false,
-                            headerCellClass: setHeaderCSS,
-                            cellTemplate: 'resources/norman-prototype-editors-client/SampleDataManager/sampleData/rowTemplate.html',
-                            headerCellTemplate: 'resources/norman-prototype-editors-client/SampleDataManager/sampleData/cornerTemplate.html'
-                        });
-                        var dynamicColDef = dynamicColumnDefinition(entityMeta, response.idMap);
-                        entityTab.gridOptions.columnDefs = entityTab.gridOptions.columnDefs.concat(dynamicColDef);
-                        entityTabs.push(entityTab);
-                    }
-                    $scope.entityTabs = entityTabs;
-                    $scope.selectedTab = entityTabs[0].name;
-                    uiDialogHelper.open('sd-grid-dialog-id');
-                },
-                function (err) {
-                    handleError(err);
-                });
-        };
-
-        function _findGridOptions(row) {
-            return row.name.toLowerCase() === $scope.localEntityName.toLowerCase();
-        }
-
-        function _getHiddenColumns(tabName) {
-            return $scope.hiddenCols[tabName];
-        }
-
-        function cleanProperties(properties) {
-            delete properties['+'];
-            if (properties.hasOwnProperty('dirtyCells')) {
-                delete properties.dirtyCells;
-            }
-            if (properties.hasOwnProperty('isHighLight')) {
-                delete properties.isHighLight;
-            }
-            if (properties.hasOwnProperty('errorText')) {
-                delete properties.errorText;
-            }
-        }
-
-        var fnError = function (error) {
-            var entityTabs = $scope.entityTabs;
-            var entities = $scope.sampleData.entities;
-            _.forEach($scope.errorList, removehighlight);
-            SampleDataHelper.convertErrorSyntax(error.data.errorList, entityTabs, entities)
-                .then(function (response) {
-                    $scope.errorList = response;
-                    openPopUp($scope.errorList.length + ' error(s) found,fix them before you can proceed');
-                    _.forEach($scope.errorList, highlight);
-                }, function (err) {
-                    openPopUp(err);
-                });
-        };
-        var fnSuccess = function () {
-            angular.element(document.getElementById('ui-dialog-modal-backdrop')).unbind('click', $scope.triggerModalClick);
-            // close the dialog
-            $scope.saveError = false;
-            $scope.cleanDialog('sd-grid-dialog-id');
-        };
-
-        $scope.triggerSave = function () {
-            var entityNameLcase;
-            var aHiddenColNames = {};
-
-            for (var c = 0; c < $scope.sampleData.entities.length; c++) {
-                $scope.localEntityName = $scope.sampleData.entities[c].entityName;
-                aHiddenColNames[$scope.localEntityName.toLowerCase()] = _getHiddenColumns($scope.localEntityName);
-                var gridDataResult = _.result(_.find($scope.entityTabs, _findGridOptions), 'gridOptions');
-                if (gridDataResult) {
-                    var gridData = gridDataResult.data;
-                    $scope.sampleData.entities[c].properties = gridData;
-                }
-            }
-
-            function findIndexOfEntity(item) {
-                return item.entityName.toLowerCase() === entityNameLcase;
-            }
-
-            for (var i = 0; i < $scope.entityTabs.length; i++) {
-                entityNameLcase = $scope.entityTabs[i].name.toLowerCase();
-                var replaceEntity = _.find($scope.sampleData.entities, findIndexOfEntity);
-                replaceEntity.properties = _.clone($scope.entityTabs[i].gridOptions.data, true);
-                for (var j = 0; j < replaceEntity.properties.length; j++) {
-                    var properties = replaceEntity.properties[j];
-                    cleanProperties(properties);
-                    if (aHiddenColNames[entityNameLcase]) {
-                        for (var n = 0; n < aHiddenColNames[entityNameLcase].length; n++) {
-                            delete properties[aHiddenColNames[entityNameLcase][n]];
-                        }
-                    }
-                }
-            }
-            var postData = {
-                sampleData: $scope.sampleData,
-                dataModelJson: $scope.dataModelJson
-            };
-            var params = {
-                projId: $scope.sampleData.projectId
-            };
-            sampleDataFactoryService.saveSampleData(params, postData, fnSuccess, fnError);
-        };
-
-        $scope.sdCancelled = function () {
-            $scope.checkarray = [];
-            angular.element(document.getElementById('ui-dialog-modal-backdrop')).unbind('click', $scope.triggerModalClick);
-        };
-        $scope.triggerNewLine = function (activeRow) {
-            var selectedTab = $scope.getSelectedTabId();
-            var index = _.findIndex($scope.entityTabs, function (row) {
-                return row.name.toLowerCase() === selectedTab.toLowerCase();
-            });
-            var data = $scope.entityTabs[index].gridOptions.data;
-            var columnDefs = $scope.entityTabs[index].gridOptions.columnDefs;
-            var sampleRow = {};
-            for (var c = 0; c < columnDefs.length; c++) {
-                sampleRow[columnDefs[c].name] = null;
-            }
-            if (activeRow) {
-                var selectedRowIndex = _.findIndex(data, function (item) {
-                    return item.$$hashKey === activeRow.entity.$$hashKey;
-                });
-                data.splice(selectedRowIndex + 1, 0, sampleRow);
-                var grid = $scope.gridApis[$scope.tab.active].grid;
-                $scope.gridApis[$scope.tab.active].core.refresh();
-                $timeout(function () {
-                    var elementId = grid.rows[selectedRowIndex + 1].entity.$$hashKey;
-                    var clientHeight = document.documentElement.clientHeight;
-                    var elementBottomPosition = document.querySelectorAll('#btn-' + elementId)[0].getBoundingClientRect().bottom;
-                    if (elementBottomPosition <= clientHeight) {
-                        grid.api.cellNav.scrollTo(grid, $scope, grid.rows[selectedRowIndex + 1].entity, null);
-                    }
-                }, 300);
-            }
-            else {
-                data.push(sampleRow);
-                $timeout(function () {
-                    var grid = $scope.gridApis[$scope.tab.active].grid;
-                    grid.api.cellNav.scrollTo(grid, $scope, grid.rows[grid.rows.length - 1].entity, null);
-                });
-            }
-        };
-
-        $scope.triggerDelete = function () {
-            var selectedTab = $scope.getSelectedTabId();
-            var selEntityTab = _.find($scope.entityTabs, function (entityTab) {
-                return entityTab.name.toLowerCase() === selectedTab.toLowerCase();
-            });
-            if ($scope.gridApis[selEntityTab.name]) {
-                var deletableData = $scope.gridApis[selEntityTab.name].selection.getSelectedRows();
-                selEntityTab.gridOptions.data = _.difference(selEntityTab.gridOptions.data, deletableData);
-
-                if (!(_.some($scope.entityTabs[0].gridOptions.data, 'errorText'))) {
-                    delete $scope.entityTabs[0].inactiveErrorStyle;
-                    delete $scope.entityTabs[0].activeErrorStyle;
-                }
-            }
-        };
-
-        $scope.triggerDuplicate = function () {
-            var selectedTab = $scope.getSelectedTabId();
-            var selEntityTab = _.find($scope.entityTabs, function (entityTab) {
-                return entityTab.name.toLowerCase() === selectedTab.toLowerCase();
-            });
-            if ($scope.gridApis[selEntityTab.name]) {
-                var index = _.findIndex($scope.entityTabs, function (row) {
-                    return row.name.toLowerCase() === selectedTab.toLowerCase();
-                });
-                var data = $scope.entityTabs[index].gridOptions.data;
-                var selectedData = JSON.parse(JSON.stringify($scope.gridApis[selEntityTab.name].selection.getSelectedRows())); // to avoid reference
-                var selectedRowIndex = _.findIndex(data, function (item) {
-                    return item.$$hashKey === selectedData[selectedData.length - 1].$$hashKey;
-                });
-                for (var i = 0; i < selectedData.length; i++) {
-                    delete selectedData[i].$$hashKey;
-                    data.splice(selectedRowIndex + i + 1, 0, selectedData[i]);
-                }
-            }
-        };
-
-        $scope.getSelectedTabId = function () {
-            return $scope.tab.active;
-        };
-
-        $scope.isActiveTab = function (tabKey) {
-            return tabKey === $scope.currentEntityTab.key;
-        };
-
-        /*** Key Event Handlers START ****************/
-
-        function directionIncement(gridRows, keyCode, indexAt) {
-            var nextRow;
-            switch (keyCode) {
-                case 40:
-                    nextRow = gridRows[++indexAt.index];
-                    break;
-                case 38:
-                    nextRow = gridRows[--indexAt.index];
-                    break;
-            }
-            return nextRow;
-        }
-
-        $scope.onKeyUp = function ($event) {
-            if ($event.shiftKey) {
-                if (!$scope.lastSelectedRow) {
-                    return;
-                }
-                var gridRows = $scope.gridApis[$scope.getSelectedTabId()].grid.rows;
-                var indexAt = {
-                    index: _.findIndex(gridRows, function (item) {
-                        return item.entity.$$hashKey === $scope.lastSelectedRow.entity.$$hashKey;
-                    })
-                };
-                var nextRow = directionIncement(gridRows, $event.keyCode, indexAt);
-                if (nextRow) {
-                    if (nextRow.isSelected) {
-                        // find next unselected Row
-                        while (nextRow && nextRow.isSelected) {
-                            nextRow = directionIncement(gridRows, $event.keyCode, indexAt);
-                        }
-                        if (nextRow) {
-                            $scope.gridApis[$scope.getSelectedTabId()].selection.selectRow(nextRow.entity);
-                        }
-                    }
-                    else {
-                        $scope.gridApis[$scope.getSelectedTabId()].selection.selectRow(nextRow.entity);
-                    }
-                }
-
-            }
-
-        };
-
-        $scope.isSelected = function (tabName) {
-            if (tabName.toLowerCase() === $scope.tab.active.toLowerCase()) {
-                return true;
-            }
-            return false;
-        };
-
-        $scope.okBtnClicked = function () {
-            $scope.triggerSave();
-            return false; // return false to avoid dialog close
-        };
-        /*** Key Event Handlers END ***************/
-        // Trigger Editor dialog on load of Controller
-        if ($rootScope.loadSDEDitor) {
-            $rootScope.loadSDEDitor = false;
-            $scope.getEntityNavDataForProj($rootScope.sampleData.id, $rootScope.sampleData.entityName);
-        }
-        this.sampleDataControllerSafe = true;
+function lodashRemoveEntity(item) {
+    if (!item) {
+        return true;
     }
-];
+    return item.entityName === removeEntity;
+}
+
+function removeNull(item) {
+    return !Object.keys(item).length;
+}
+
+function isCalculated(calculated) {
+    var bIsCalculated = false;
+    if (calculated && calculated.inputProperties && calculated.inputProperties.length !== 0) {
+        bIsCalculated = true;
+    }
+    return bIsCalculated;
+}
+
+function SampleDataManager(sampleData, dataModel, bValidate, pDefer) {
+    var p = Promise.defer();
+    var errorList = [];
+    if (!(this instanceof SampleDataManager)) {
+        return new SampleDataManager(sampleData, dataModel, bValidate);
+    }
+    this.sampleData = sampleData;
+    if (bValidate) {
+        if (!dataModel) {
+            var dmError = {
+                text: 'Data Model is required for validation.'
+            };
+            errorList.push(dmError);
+            throwErrors(errorList, pDefer);
+        }
+        this.dataModel = new DataModel(dataModel);
+    }
+
+    function checkValidationSuccess(sdEntity, propMeta, propValue, convertedValue) {
+        if ((propValue !== convertedValue) && (convertedValue === null)) {
+            // conversion error happened
+            var conversionError = {
+                text: 'Type mismatch',
+                column: propValue,
+                entityName: sdEntity.entityName,
+                colname: propMeta.name
+            };
+            errorList.push(conversionError);
+        }
+    }
+
+    // validates primary key uniqueness
+    // works for complex keys as well
+    this.validatePrimaryKeys = function (primaryKeys) {
+        if (!primaryKeys) {
+            return;
+        }
+        var pkNames = null;
+
+        function concatKeys(elem) {
+            return JSON.stringify(elem, pkNames);
+        }
+
+        function checkItem(item) {
+            var checkIfExists = _.findWhere(uniq, item);
+            if (!checkIfExists) {
+                uniq.push(item);
+            }
+            return !_.findWhere(uniq, item);
+        }
+
+        for (var entityId in primaryKeys) {
+            var entityPKs = primaryKeys[entityId];
+            pkNames = _.keys(entityPKs[0]);
+            _.remove(primaryKeys[entityId], removeNull);
+            var trimmedData = _.uniq(primaryKeys[entityId], concatKeys);
+            var differdrows = _.difference(primaryKeys[entityId], trimmedData);
+
+            var uniq = [];
+
+            _.find(differdrows, checkItem);
+            differdrows = uniq;
+            if (differdrows.length > 0) {
+                for (var i = 0; i < differdrows.length; i++) {
+                    var DifferKeys = _.keys(differdrows[i]);
+                    DifferKeys = DifferKeys[0];
+                    var dupPK = {
+                        text: 'Duplicate Key',
+                        column: differdrows[i][DifferKeys],
+                        entityName: this.dataModel.idMap.entityMap[entityId].name,
+                        colname: this.dataModel.idMap.entityMap[entityId].properties[DifferKeys].name,
+                        isKey: true
+                    };
+                    if (dupPK.column) {
+                        errorList.push(dupPK);
+                    }
+                }
+            }
+        }
+    };
+
+    this.validateForeignKeys = function (primKeyArrays) {
+        for (var i = 0; i < this.sampleData.entities.length; i++) {
+            var entity = this.sampleData.entities[i];
+            var dEntityProp = this.dataModel.getModelEntityNameMap(entity.entityName);
+            var dPropNames = dEntityProp.properties;
+            for (var j = 0; j < entity.properties.length; j++) {
+                var prop = entity.properties[j];
+                for (var propName in prop) {
+                    var propMeta = dPropNames[propName.toLowerCase()];
+                    if (propMeta.isForeignKey) {
+                        var dPrimKeyData = this.dataModel.getPrimaryKeyMetaData(entity.entityId, propMeta._id);
+                        if (dPrimKeyData) {
+                            if (primKeyArrays[dPrimKeyData.entityId]) {
+                                var primKeyVals = primKeyArrays[dPrimKeyData.entityId][dPrimKeyData.primaryKeyId];
+                                if (!primKeyVals || primKeyVals.indexOf(prop[propName]) === -1) {
+                                    prop[propName] = null;
+                                }
+                            }
+                        } else {
+                            prop[propName] = null;
+                        }
+
+                    }
+                }
+            }
+        }
+    };
+
+    // format corrects the entity and property names (case) as per Data Model
+    // format does the check for existence of entity names and property names
+    this.formatAndValidate = function () {
+
+        var primaryKeys = {};
+        var primKeyArrays = {};
+        var uniqueEntities = _.uniq(this.sampleData.entities, function (item) {
+            return item.entityName.toLowerCase();
+        });
+        if (uniqueEntities.length !== this.sampleData.entities.length) {
+            var dupEntity = {
+                text: 'Duplicate Entities found.'
+            };
+            errorList.push(dupEntity);
+            // also removes the duplicated entity to avoid clash in further validation
+        }
+        var removableEntities = [];
+        this.sampleData.entities = _.map(this.sampleData.entities, function (sdEntity) {
+            var outEntity = {};
+            var lEntityProp = this.dataModel.getModelEntityNameMap(sdEntity.entityName);
+            if (!lEntityProp) {
+                var entityNotFound = {
+                    text: 'Entity "' + sdEntity.entityName + '" not found'
+                };
+                errorList.push(entityNotFound);
+                // remove if invalid entity to skip property validation
+                removableEntities.push(sdEntity.entityName);
+                return null;
+            }
+            outEntity.entityName = lEntityProp.name;
+            outEntity.entityId = lEntityProp._id;
+            var dPropNames = lEntityProp.properties;
+            primaryKeys[lEntityProp._id] = [];
+            primKeyArrays[lEntityProp._id] = {};
+            var primaryKeyValue;
+            outEntity.properties = _.map(sdEntity.properties, function (sdPropObj) {
+                var pmKeyEntry = {};
+                var outProp = {};
+                for (var sdPropName in sdPropObj) {
+                    var propMeta = dPropNames[sdPropName.toLowerCase()];
+                    var propValue = sdPropObj[sdPropName];
+                    if (!propMeta) {
+                        errorList.push({
+                            text: 'Invalid property: ' + sdPropName
+                        });
+                        continue;
+                    }
+                    if (isCalculated(propMeta.calculated)) {
+                        continue; // its a calculated property so eliminate the property
+                    }
+                    if (propMeta.isKey && !propValue) {
+                        var keyMissing = {
+                            text: 'Key value missing',
+                            column: propValue,
+                            entityName: sdEntity.entityName,
+                            colname: propMeta.name,
+                            isKey: true
+                        };
+                        if (!_.findWhere(errorList, keyMissing)) {
+                            errorList.push(keyMissing);
+                        }
+                    }
+                    var expectedType = propMeta.propertyType;
+                    var convertedValue = module.exports.checkAndConvertType(propValue, expectedType);
+                    checkValidationSuccess(sdEntity, propMeta, propValue, convertedValue);
+                    outProp[propMeta.name] = convertedValue;
+                    if (propMeta.isKey) {
+                        primaryKeyValue = propValue;
+                        pmKeyEntry[propMeta._id] = convertedValue;
+                        if (!primKeyArrays[lEntityProp._id][propMeta._id]) {
+                            primKeyArrays[lEntityProp._id][propMeta._id] = [];
+                        }
+                        primKeyArrays[lEntityProp._id][propMeta._id].push(convertedValue);
+                    }
+                }
+                errorList.forEach(function (error) {
+                    if (!error.primaryKey) {
+                        error.primaryKey = primaryKeyValue;
+                    }
+                });
+                primaryKeys[lEntityProp._id].push(pmKeyEntry);
+                return outProp;
+            }, this);
+            return outEntity;
+        }, this);
+        if (removableEntities.length > 0) {
+            for (var i = 0; i < removableEntities.length; i++) {
+                removeEntity = removableEntities[i];
+                _.remove(this.sampleData.entities, lodashRemoveEntity);
+            }
+        }
+        this.validatePrimaryKeys(primaryKeys);
+        this.validateForeignKeys(primKeyArrays);
+    };
+    if (bValidate) {
+        this.formatAndValidate();
+        if (errorList.length > 0) {
+            throwErrors(errorList, pDefer);
+        }
+    }
+    return p.Promise;
+}
+
+module.exports = {
+    initialize: function () {
+        return prototypeHelper.initialize();
+    },
+    checkSchema: function (done) {
+        prototypeHelper.checkSchema(done);
+    },
+    onInitialized: function () {
+        prototypeHelper.onInitialize();
+    },
+
+
+    // API call
+
+    updateSD: function (dataModelJson, sampleData, bValidate, bWait, user, buildSessionId) {
+
+        if (!dataModelJson.projectId) {
+            return Promise.reject('Project Id is mandatory.');
+        }
+        if (sampleData.projectId) {
+            if (sampleData.projectId !== dataModelJson.projectId) {
+                return Promise.reject('Invalid Project Id.');
+            }
+        }
+        else {
+            sampleData.projectId = dataModelJson.projectId;
+        }
+
+        var generateSDMInstance = function () {
+            var p = Promise.defer();
+            try {
+                p.resolve(new SampleDataManager(sampleData, dataModelJson, bValidate, p));
+            }
+            catch (err) {
+                p.reject(err);
+            }
+            return p.promise;
+        };
+
+        return generateSDMInstance()
+            .then(function (sdMInstance) {
+                return prototypeHelper.update(sdMInstance.sampleData, user, true, buildSessionId);
+            })
+            .catch(function (err) {
+                serviceLogger.error(err);
+                throw err;
+            });
+
+    },
+
+
+    // model change
+
+    updateSDNoValidation: function (sampleData, user) {
+        var sdMInstance = new SampleDataManager(sampleData, null, false);
+
+        return prototypeHelper.update(sdMInstance.sampleData, user, false)
+            .catch(function (err) {
+                serviceLogger.error(err);
+                throw err;
+            });
+    },
+
+    getSDfromProjId: function (projectId, entityNamesArray) {
+
+        return prototypeHelper.get(projectId)
+            .then(function (result) {
+                if (!result) {
+                    return null;
+                }
+                var sdResult = result;
+                if (entityNamesArray && entityNamesArray.length > 0) {
+                    var lEntityNamesArray = _.map(entityNamesArray, function (name) {
+                        return name.toLowerCase();
+                    });
+                    var filteredEntities = _.filter(sdResult.entities, function (entity) {
+                        return (lEntityNamesArray.indexOf(entity.entityName.toLowerCase()) !== -1);
+                    });
+                    sdResult.entities = filteredEntities;
+                }
+                return sdResult;
+            })
+            .catch(function (err) {
+                serviceLogger.error(err);
+                throw err;
+            });
+    },
+
+    getSDfromProjIdNoWait: function (projectId, entityNamesArray) {
+        return prototypeHelper.get(projectId)
+            .then(function (result) {
+                if (!result) {
+                    return null;
+                }
+                var sdResult = result;
+                if (entityNamesArray && entityNamesArray.length > 0) {
+                    var lEntityNamesArray = _.map(entityNamesArray, function (name) {
+                        return name.toLowerCase();
+                    });
+                    var filteredEntities = _.filter(sdResult.entities, function (entity) {
+                        return (lEntityNamesArray.indexOf(entity.entityName.toLowerCase()) !== -1);
+                    });
+                    sdResult.entities = filteredEntities;
+                }
+                return sdResult;
+            }, function (err) {
+                serviceLogger.error(err);
+                throw err;
+            });
+    },
+
+    checkAndConvertType: function (data, toType) {
+        var convertedData = null;
+        if (data === null || data === undefined || !toType) {
+            return convertedData;
+        }
+        switch (toType.toLowerCase()) {
+            case 'string':
+                convertedData = String(data);
+                break;
+            case 'decimal':
+            case 'float':
+            case 'number':
+            case 'single':
+            case 'double':
+                if (typeof (data) === 'number') {
+                    convertedData = data;
+                }
+                var parsedNum = parseFloat(data);
+                if (!isNaN(parsedNum)) {
+                    convertedData = parsedNum;
+                }
+                break;
+            case 'int':
+            case 'int16':
+            case 'int32':
+            case 'int64':
+            case 'integer':
+                var parsedNumInt = parseInt(data, 10);
+                if (!isNaN(parsedNumInt)) {
+                    convertedData = parsedNumInt;
+                }
+                break;
+            case 'boolean':
+                if (typeof (data) === 'boolean') {
+                    convertedData = data;
+                }
+                else if (typeof (data) === 'string') {
+                    data = data.toLowerCase();
+                    if (data === 'true') {
+                        convertedData = true;
+                    }
+                    else if (data === 'false') {
+                        convertedData = false;
+                    }
+                }
+                break;
+            case 'time':
+                if (typeof (data) === 'string') {
+                    data = data.trim();
+                    var split = data.split(':');
+                    var tempConvertedTime = new Date(Date.UTC(1970, 0, 1, split[0], split[1], split[1]));
+                    if (tempConvertedTime instanceof Date && isFinite(tempConvertedTime)) {
+                        convertedData = tempConvertedTime;
+                    }
+                }
+                break;
+            case 'date':
+            case 'datetime':
+            case 'datetimeoffset':
+                if (typeof (data) === 'string') {
+                    var tempConvertedDate = new Date(data);
+                    if (tempConvertedDate instanceof Date && isFinite(tempConvertedDate)) {
+                        convertedData = tempConvertedDate;
+                    }
+                }
+                if (data instanceof Date && isFinite(data)) {
+                    convertedData = data;
+                }
+                break;
+            default:
+                convertedData = data;
+                break;
+        }
+        return convertedData;
+    }
+};
