@@ -1,141 +1,644 @@
 'use strict';
+
+var _ = require('norman-client-tp').lodash;
 var moment = require('norman-client-tp').moment;
+
 module.exports = [
+    '$rootScope',
     '$scope',
-    function ($scope) {
-        $scope.headerTypeMap = null;
+    '$http',
+    '$q',
+    '$timeout',
+    '$interval',
+    '$stateParams',
+    'sdm.sampleData',
+    'SampleDataHelper',
+    'uiError',
+    'uiDialogHelper',
+    function ($rootScope, $scope, $http, $q, $timeout, $interval, $stateParams, sampleDataFactoryService, SampleDataHelper, uiError, uiDialogHelper) {
+        var openPopUp = function (text) {
+            uiError.create({
+                content: text,
+                dismissOnTimeout: false,
+                dismissButton: true
+            });
+        };
+        /***ERROR HANDLING START***/
+        $scope.tab = {
+            active: ''
+        };
 
-        function cellTypeMatched(value, type) {
-            var matched = false;
-            if (!value && !type) {
-                return matched;
-            }
-            switch (type.toLowerCase()) {
-                case 'string':
-                    matched = true;
-                    break;
-                case 'decimal':
-                case 'float':
-                case 'number':
-                case 'single':
-                case 'double':
-                case 'int':
-                case 'int16':
-                case 'int32':
-                case 'int64':
-                case 'integer':
-                    matched = !isNaN(value);
-                    break;
-
-                case 'boolean':
-                    var input = (typeof value !== 'undefined') ? value.toString().toLowerCase() : '';
-                    if (input === 'true' || input === 'false') {
-                        matched = true;
-                    }
-                    break;
-
-                case 'time':
-                    if (value) {
-                        value = value.trim();
-                        var check = /^(?:2[0-3]|[01]?[0-9]):[0-5][0-9]:[0-5][0-9]$/;
-                        matched = check.test(value);
-                    } else {
-                        matched = false;
-                    }
-
-                case 'date':
-                case 'datetime':
-                case 'datetimeoffset':
-                    if (!value) {
-                        matched = true;
-                    } else {
-                        value = value.trim();
-                        var match = /^[0-9]{4}-(((0[13578]|(10|12))-(0[1-9]|[1-2][0-9]|3[0-1]))|(02-(0[1-9]|[1-2][0-9]))|((0[469]|11)-(0[1-9]|[1-2][0-9]|30)))$/;
-                        if (match.test(value)) {
-                            if (typeof value === 'string') {
-                                value = moment.parseZone(value + ' UTC');
-                                value = value._d;
-                            }
-                            if (value instanceof Date && isFinite(value)) {
-                                matched = true;
-                            }
-                        }
-                    }
-
-                    break;
-            }
-            return matched;
+        function handleError(err) {
+            $scope.openToast(err.data);
         }
 
-        function setHeaderTypeMap(dataModel) {
-            var localMap = {};
-            for (var i = 0; i < dataModel.entities.length; i++) {
-                var entity = dataModel.entities[i];
-                localMap[entity.name] = {};
-                for (var j = 0; j < entity.properties.length; j++) {
-                    var property = entity.properties[j];
-                    localMap[entity.name][property.name] = {
-                        type: property.propertyType.toLowerCase(),
-                        isKey: property.isKey
-                    };
-                }
-            }
-            return localMap;
-        }
 
-        $scope.removeHighlight = function (row, col) {
-            if (row.entity[col] !== $scope.stroredValue) {
-                if (row.entity.isHighLight) {
-                    var index = row.entity.isHighLight.indexOf(col);
-                    if (index > -1) {
-                        row.entity.isHighLight.splice(index, 1);
-                    }
-                    if (row.entity.isHighLight.length === 0) {
-                        delete row.entity.isHighLight;
-                    }
-                }
-                if (row.entity.isHighLight && row.entity.isHighLight.length === 0) {
-                    delete row.entity.isHighLight;
-                }
-            }
-            if (row.entity.errorText) {
-                delete row.entity.errorText[col];
-                if (Object.keys(row.entity.errorText).length === 0) {
-                    delete row.entity.errorText;
-                }
-            }
+        var previousTab;
+
+        $scope.saveCurrentTab = function () {
+            previousTab = $scope.tab.active;
         };
-        $scope.storeEntity = function (rowValue) {
-            $scope.stroredValue = rowValue;
-        };
-        $scope.validateCellData = function (row, colField) {
-            if (!$scope.headerTypeMap) {
-                $scope.headerTypeMap = setHeaderTypeMap(row.grid.options.dataModel);
+        $scope.changeToPrevTab = function () {
+            function change() {
+                if ($scope.tab.active !== previousTab) {
+                    $scope.tab.active = previousTab;
+                }
             }
 
-            if (!row.entity[colField]) {
-                row.entity[colField] = null;
-            }
-            var newValue = row.entity[colField];
-            var isTypeMatched = cellTypeMatched(newValue, $scope.headerTypeMap[row.grid.options.tabName][colField].type);
-            if (!isTypeMatched) {
-                $scope.invalidCellEntry = true;
-                if (!row.entity.dirtyCells) {
-                    row.entity.dirtyCells = [];
-                }
-                var columnName = row.grid.api.cellNav.getFocusedCell().col.name;
-                if (row.entity.dirtyCells.indexOf(columnName) === -1) {
-                    row.entity.dirtyCells.push(columnName);
-                }
+            $timeout(change, 200);
+        };
+
+        var changeTab = function (data) {
+            var tab = data.tab.tabNum;
+            var column = data.column;
+            var row = data.row;
+            var rowEntity = data.rowEntity;
+            var tabName = data.tab.tabName;
+            var grid = $scope.gridApis[$scope.tab.active].grid;
+            var localGridOptions = $scope.entityTabs[tab].gridOptions;
+            localGridOptions.enableCellEditOnFocus = false;
+            grid.api.cellNav.scrollTo(grid, $scope, rowEntity, null);
+            $scope.entityTabs[tab].activeErrorStyle = {
+                background: '#EF6152'
+            };
+            $scope.entityTabs[tab].inactiveErrorStyle = {
+                color: '#EF6152'
+            };
+            if (localGridOptions.data[row].isHighLight) {
+                localGridOptions.data[row].isHighLight.push(column);
             }
             else {
-                if (row.entity.dirtyCells) {
-                    var index = row.entity.dirtyCells.indexOf(row.grid.api.cellNav.getFocusedCell().col.name);
-                    if (index > -1) {
-                        row.entity.dirtyCells.splice(index, 1);
-                    }
+                localGridOptions.data[row].isHighLight = [column];
+            }
+            if (!localGridOptions.data[row].errorText) {
+                localGridOptions.data[row].errorText = {};
+            }
+            localGridOptions.data[row].errorText[column] = data.text;
+            $scope.gridApis[tabName].selection.selectRow(data.rowEntity);
+            $scope.$emit('uiGridEventEndCellEdit');
+        };
+
+        var highlight = function (data) {
+            if (typeof data.tab !== 'undefined') {
+                $timeout(function () {
+                    changeTab(data);
+                }, 200);
+            }
+        };
+
+        var removehighlight = function (data) {
+            if (typeof data.tab !== 'undefined') {
+                var tab = data.tab.tabNum;
+                var row = data.row;
+                var localGridOptions = $scope.entityTabs[tab].gridOptions;
+                if (localGridOptions.data[row]) {
+                    delete localGridOptions.data[row].isHighLight;
+                    delete localGridOptions.data[row].errorText;
                 }
             }
         };
+
+        /***ERROR HANDLING END***/
+        function getForeignKeyName(foreignKeyId, entityId, idMap) {
+            var foreignKeyProp = idMap.foreignKeyMap[entityId][foreignKeyId];
+            var relationName = foreignKeyProp.relationName;
+            var sourceEntityId, targetEntityId, sourceEntityName, targetEntityName;
+            if (foreignKeyProp.multiplicity) {
+                sourceEntityId = idMap.foreignKeyMap[entityId][foreignKeyId].entityId;
+                sourceEntityName = idMap.entityMap[sourceEntityId].name;
+                targetEntityName = idMap.entityMap[entityId].name;
+            }
+            else {
+                targetEntityId = idMap.foreignKeyMap[entityId][foreignKeyId].entityId;
+                sourceEntityName = idMap.entityMap[entityId].name;
+                if (foreignKeyProp.selfNavigation) {
+                    targetEntityName = sourceEntityName;
+                }
+                else {
+                    targetEntityName = idMap.entityMap[targetEntityId].name;
+                }
+            }
+            return sourceEntityName + '.' + relationName + '.' + targetEntityName;
+        }
+
+        function rebaseSampleData(entityMeta, properties) {
+            var aDMProperties = _.map(entityMeta.properties, 'name');
+            var propName = null,
+                i;
+            var loopInPropArray = function (value, index) {
+                if ((value !== propName) && (value.toLowerCase() === propName.toLowerCase())) {
+                    properties[i][aDMProperties[index]] = properties[i][propName];
+                    delete properties[i][propName];
+                }
+            };
+            for (i = 0; i < properties.length; i++) {
+                for (propName in properties[i]) {
+                    aDMProperties.forEach(loopInPropArray);
+                }
+            }
+        }
+
+        $scope.$on('removeError', function (event, data) {
+            var findTabIndex = function (tabname, EntityTabs) {
+                var id = _.findIndex(EntityTabs, function (tab) {
+                    return tab.name.toLowerCase() === tabname.toLowerCase();
+                });
+                return id;
+            };
+            var tab = findTabIndex(data, $scope.entityTabs);
+            delete $scope.entityTabs[tab].inactiveErrorStyle;
+            delete $scope.entityTabs[tab].activeErrorStyle;
+        });
+        $scope.$on('SampleDataEditor', function (event, data) {
+            $rootScope.loadSDEDitor = false;
+            $scope.getEntityNavDataForProj(data.id, data.entityName);
+        });
+        $scope.$on('hidePop', function () {
+            $timeout(function () {
+                $scope.popupShow = {
+                    visibility: 'hidden'
+                };
+            }, 250);
+        });
+        $scope.$on('emitRow', function (event, emitRow) {
+            $scope.popupShow = {
+                visibility: 'hidden'
+            };
+            if (emitRow.row.isSelected) {
+                $timeout(function () {
+                    $scope.popupShow = {
+                        visibility: 'visible',
+                        top: emitRow.coordinates.y + 'px',
+                        left: '45px'
+                    };
+                }, 251);
+                $scope.emittedRow = emitRow.row;
+            }
+        });
+        var addLineListener = $scope.$on('addLine', function () {
+            $scope.triggerNewLine();
+        });
+
+        $scope.$on('$destroy', function () {
+            addLineListener(); // remove listener.
+        });
+
+        $scope.saveNcloseDialog = function () {
+            return function () {
+                $scope.triggerSave();
+            };
+        };
+
+        $scope.cleanDialog = function (id) {
+            angular.element(document.getElementById(id)).data().$isolateScope.dialogClean();
+        };
+
+        $scope.triggerModalClick = $scope.saveNcloseDialog('sd-grid-dialog-id');
+
+        $scope.openSDDialog = function () {
+            angular.element(document.getElementById('ui-dialog-modal-backdrop')).bind('click', $scope.triggerModalClick);
+        };
+        $scope.reOpenOnError = function () {
+            uiDialogHelper.open('sd-grid-dialog-id');
+        };
+
+        $scope.addHiddenCol = function (colName) {
+            if (!$scope.hiddenCols[$scope.tab.active]) {
+                $scope.hiddenCols[$scope.tab.active] = [];
+            }
+            $scope.hiddenCols[$scope.tab.active].push(colName);
+        };
+
+        $scope.checkarray = [];
+
+        function dateCheck(a) {
+            for (var i = 0; i < a.properties.length; i++) {
+                switch (a.properties[i].propertyType.toLowerCase()) {
+                    case 'time':
+                    case 'datetime':
+                        $scope.checkarray.push({
+                            name: a.properties[i].name,
+                            type: a.properties[i].propertyType.toLowerCase()
+                        });
+                }
+            }
+        }
+
+        function dateParse(data, opt) {
+            if ($scope.checkarray.length > 0) {
+                var checkArr = $scope.checkarray;
+                for (var i = 0; i < checkArr.length; i++) {
+                    for (var j = 0; j < data.properties.length; j++) {
+                        var parse = data.properties[j][checkArr[i].name];
+                        if (parse) {
+                            switch (opt) {
+                                case 'format':
+                                    if (checkArr[i].type === 'datetime') {
+                                        parse = moment(parse).format('YYYY-MM-DD');
+                                    } else if (checkArr[i].type === 'time') {
+                                        parse = moment.utc(parse).format('HH:mm:ss');
+                                    }
+                                    break;
+                                case 'parse':
+                                    var parseDate = (moment.parseZone(parse + ' UTC'))._d;
+                                    if ((parseDate instanceof Date) && isFinite(parseDate)) {
+                                        parse = parseDate;
+                                    }
+                                    break;
+                                default:
+
+                            }
+                            data.properties[j][checkArr[i].name] = parse;
+                        }
+                    }
+                }
+            }
+            return data;
+        }
+
+        var registerGridApi = function (gridApi) {
+            if (!$scope.gridApis) {
+                $scope.gridApis = {};
+            }
+            $scope.gridApis[gridApi.grid.options.tabName] = gridApi;
+            gridApi.selection.on.rowSelectionChanged($scope, function (row) {
+                if (row.isSelected) {
+                    $scope.lastSelectedRow = row;
+                }
+                $scope.gridApis[gridApi.grid.options.tabName] = gridApi;
+            });
+        };
+
+        function setHeaderCSS(grid, row, column) {
+            if (column.colDef.isForeignKey) {
+                return 'sd-foreign-key-class';
+            }
+        }
+
+        function dynamicColumnDefinition(entityMeta, idMap) {
+            var pkColDefItem = [];
+            var fkColDefItem = [];
+            var orderColDefItem = [];
+            for (var j = 0; j < entityMeta.properties.length; j++) {
+                var colDefItem = {
+                    name: entityMeta.properties[j].name,
+                    order: entityMeta.properties[j].order,
+                    isForeignKey: entityMeta.properties[j].isForeignKey,
+                    enableSorting: true,
+                    enableHiding: false,
+                    headerCellClass: setHeaderCSS,
+                    isPrimaryKey: entityMeta.properties[j].isKey,
+                    cellTemplate: 'resources/norman-prototype-editors-client/SampleDataManager/sampleData/cellTemplate.html',
+                    editableCellTemplate: 'resources/norman-prototype-editors-client/SampleDataManager/sampleData/editableCellTemplate.html',
+                    headerCellTemplate: 'resources/norman-prototype-editors-client/SampleDataManager/sampleData/columnHeader.html'
+                };
+                if (entityMeta.properties[j].calculated.inputProperties.length !== 0) {
+                    colDefItem.enableCellEdit = false;
+                }
+                if (entityMeta.properties[j].isForeignKey) {
+                    colDefItem.displayName = getForeignKeyName(entityMeta.properties[j]._id, entityMeta._id, idMap);
+                    fkColDefItem.push(colDefItem);
+                }
+                else if (entityMeta.properties[j].isKey) {
+                    colDefItem.displayName = colDefItem.name;
+                    pkColDefItem.push(colDefItem);
+                }
+                else {
+                    colDefItem.displayName = colDefItem.name;
+                    orderColDefItem.push(colDefItem);
+                }
+            }
+            // sort the non key properties
+            var sortedProperties = _.sortBy(orderColDefItem, 'order');
+            return pkColDefItem.concat(sortedProperties, fkColDefItem);
+        }
+
+        $scope.getEntityNavDataForProj = function (projId, entityName) {
+            var params = {
+                projId: projId,
+                entityName: entityName
+            };
+            $scope.saveError = false;
+
+            sampleDataFactoryService.getEntityNavDataForProj(params, function (response) {
+                    var sampleDataNav = JSON.parse(JSON.stringify(response));
+                    if (!sampleDataNav) {
+                        handleError(new Error('No Sample Data found'));
+                    }
+                    $scope.dataModelJson = sampleDataNav.dataModelJson;
+                    $scope.sampleData = sampleDataNav.sampleData;
+                    $scope.hiddenCols = {};
+                    $scope.navigationEntities = sampleDataNav.navigationEntities;
+                    // Lower case key value object pair
+                    var dataModelEntity = _.transform(sampleDataNav.dataModelJson.entities, function (result, entityObj) {
+                        result[entityObj.name.toLowerCase()] = entityObj;
+                        return result;
+                    });
+                    // Lower case key value object pair
+                    var sampleDataEntity = _.transform(sampleDataNav.sampleData.entities, function (result, entityObj) {
+                        result[entityObj.entityName.toLowerCase()] = entityObj;
+                        return result;
+                    }, {});
+
+                    var entityLCase = entityName.toLowerCase();
+                    var tableNamesL = [entityLCase];
+                    var entityTabs = [];
+                    for (var ind = 0; ind < sampleDataNav.navigationEntities.length; ind++) {
+                        tableNamesL.push(sampleDataNav.navigationEntities[ind].entityName.toLowerCase());
+                    }
+                    $scope.checkarray = [];
+                    for (var i = 0; i < tableNamesL.length; i++) {
+                        var entityMeta = dataModelEntity[tableNamesL[i]];
+                        var entityData = sampleDataEntity[tableNamesL[i]];
+                        dateCheck(entityMeta);
+                        if ($scope.checkarray.length > 0) {
+                            entityData = dateParse(entityData, 'format');
+                        }
+                        rebaseSampleData(entityMeta, entityData.properties);
+                        var entityTab = {
+                            hasError: true,
+                            name: entityData.entityName,
+                            gridOptions: {
+                                data: entityData.properties,
+                                dataModel: sampleDataNav.dataModelJson,
+                                rowHeight: 30,
+                                columnDefs: [],
+                                excludeProperties: ['dirtyCells'],
+                                enableHorizontalScrollbar: 0,
+                                enableVerticalScrollbar: 2,
+                                enableCellSelection: true,
+                                enableCellEditOnFocus: true,
+                                enableCellEdit: true,
+                                enableFiltering: true,
+                                tabName: entityData.entityName,
+                                onRegisterApi: registerGridApi,
+                                virtualizationThreshold: 2000,
+                                scrollThreshold: 10,
+                                minRowsToShow: 18,
+                                enableRowHeaderSelection: false
+                            }
+                        };
+                        if (i === 0) {
+                            entityTab.primaryTable = true;
+                        } else {
+                            entityTab.primaryTable = false;
+                        }
+                        entityTab.gridOptions.columnDefs.push({
+                            name: '+',
+                            width: 30,
+                            isForeignKey: false,
+                            enableSorting: false,
+                            isPrimaryKey: false,
+                            isRowHeader: true,
+                            enableCellEdit: false,
+                            headerCellClass: setHeaderCSS,
+                            cellTemplate: 'resources/norman-prototype-editors-client/SampleDataManager/sampleData/rowTemplate.html',
+                            headerCellTemplate: 'resources/norman-prototype-editors-client/SampleDataManager/sampleData/cornerTemplate.html'
+                        });
+                        var dynamicColDef = dynamicColumnDefinition(entityMeta, response.idMap);
+                        entityTab.gridOptions.columnDefs = entityTab.gridOptions.columnDefs.concat(dynamicColDef);
+                        entityTabs.push(entityTab);
+                    }
+                    $scope.entityTabs = entityTabs;
+                    $scope.selectedTab = entityTabs[0].name;
+                    uiDialogHelper.open('sd-grid-dialog-id');
+                },
+                function (err) {
+                    handleError(err);
+                });
+        };
+
+        function _findGridOptions(row) {
+            return row.name.toLowerCase() === $scope.localEntityName.toLowerCase();
+        }
+
+        function _getHiddenColumns(tabName) {
+            return $scope.hiddenCols[tabName];
+        }
+
+        function cleanProperties(properties) {
+            delete properties['+'];
+            if (properties.hasOwnProperty('dirtyCells')) {
+                delete properties.dirtyCells;
+            }
+            if (properties.hasOwnProperty('isHighLight')) {
+                delete properties.isHighLight;
+            }
+            if (properties.hasOwnProperty('errorText')) {
+                delete properties.errorText;
+            }
+        }
+
+        var fnError = function (error) {
+            var entityTabs = $scope.entityTabs;
+            var entities = $scope.sampleData.entities;
+            _.forEach($scope.errorList, removehighlight);
+            SampleDataHelper.convertErrorSyntax(error.data.errorList, entityTabs, entities)
+                .then(function (response) {
+                    $scope.errorList = response;
+                    openPopUp($scope.errorList.length + ' error(s) found,fix them before you can proceed');
+                    _.forEach($scope.errorList, highlight);
+                }, function (err) {
+                    openPopUp(err);
+                });
+        };
+        var fnSuccess = function () {
+            angular.element(document.getElementById('ui-dialog-modal-backdrop')).unbind('click', $scope.triggerModalClick);
+            // close the dialog
+            $scope.saveError = false;
+            $scope.cleanDialog('sd-grid-dialog-id');
+        };
+
+        $scope.triggerSave = function () {
+            var entityNameLcase;
+            var aHiddenColNames = {};
+
+            for (var c = 0; c < $scope.sampleData.entities.length; c++) {
+                $scope.localEntityName = $scope.sampleData.entities[c].entityName;
+                aHiddenColNames[$scope.localEntityName.toLowerCase()] = _getHiddenColumns($scope.localEntityName);
+                var gridDataResult = _.result(_.find($scope.entityTabs, _findGridOptions), 'gridOptions');
+                if (gridDataResult) {
+                    var gridData = gridDataResult.data;
+                    $scope.sampleData.entities[c].properties = gridData;
+                }
+            }
+
+            function findIndexOfEntity(item) {
+                return item.entityName.toLowerCase() === entityNameLcase;
+            }
+
+            for (var i = 0; i < $scope.entityTabs.length; i++) {
+                entityNameLcase = $scope.entityTabs[i].name.toLowerCase();
+                var replaceEntity = _.find($scope.sampleData.entities, findIndexOfEntity);
+                replaceEntity.properties = _.clone($scope.entityTabs[i].gridOptions.data, true);
+                for (var j = 0; j < replaceEntity.properties.length; j++) {
+                    var properties = replaceEntity.properties[j];
+                    cleanProperties(properties);
+                    if (aHiddenColNames[entityNameLcase]) {
+                        for (var n = 0; n < aHiddenColNames[entityNameLcase].length; n++) {
+                            delete properties[aHiddenColNames[entityNameLcase][n]];
+                        }
+                    }
+                }
+            }
+            var postData = {
+                sampleData: $scope.sampleData,
+                dataModelJson: $scope.dataModelJson
+            };
+            var params = {
+                projId: $scope.sampleData.projectId
+            };
+            sampleDataFactoryService.saveSampleData(params, postData, fnSuccess, fnError);
+        };
+
+        $scope.sdCancelled = function () {
+            $scope.checkarray = [];
+            angular.element(document.getElementById('ui-dialog-modal-backdrop')).unbind('click', $scope.triggerModalClick);
+        };
+        $scope.triggerNewLine = function (activeRow) {
+            var selectedTab = $scope.getSelectedTabId();
+            var index = _.findIndex($scope.entityTabs, function (row) {
+                return row.name.toLowerCase() === selectedTab.toLowerCase();
+            });
+            var data = $scope.entityTabs[index].gridOptions.data;
+            var columnDefs = $scope.entityTabs[index].gridOptions.columnDefs;
+            var sampleRow = {};
+            for (var c = 0; c < columnDefs.length; c++) {
+                sampleRow[columnDefs[c].name] = null;
+            }
+            if (activeRow) {
+                var selectedRowIndex = _.findIndex(data, function (item) {
+                    return item.$$hashKey === activeRow.entity.$$hashKey;
+                });
+                data.splice(selectedRowIndex + 1, 0, sampleRow);
+                var grid = $scope.gridApis[$scope.tab.active].grid;
+                $scope.gridApis[$scope.tab.active].core.refresh();
+                $timeout(function () {
+                    var elementId = grid.rows[selectedRowIndex + 1].entity.$$hashKey;
+                    var clientHeight = document.documentElement.clientHeight;
+                    var elementBottomPosition = document.querySelectorAll('#btn-' + elementId)[0].getBoundingClientRect().bottom;
+                    if (elementBottomPosition <= clientHeight) {
+                        grid.api.cellNav.scrollTo(grid, $scope, grid.rows[selectedRowIndex + 1].entity, null);
+                    }
+                }, 300);
+            }
+            else {
+                data.push(sampleRow);
+                $timeout(function () {
+                    var grid = $scope.gridApis[$scope.tab.active].grid;
+                    grid.api.cellNav.scrollTo(grid, $scope, grid.rows[grid.rows.length - 1].entity, null);
+                });
+            }
+        };
+
+        $scope.triggerDelete = function () {
+            var selectedTab = $scope.getSelectedTabId();
+            var selEntityTab = _.find($scope.entityTabs, function (entityTab) {
+                return entityTab.name.toLowerCase() === selectedTab.toLowerCase();
+            });
+            if ($scope.gridApis[selEntityTab.name]) {
+                var deletableData = $scope.gridApis[selEntityTab.name].selection.getSelectedRows();
+                selEntityTab.gridOptions.data = _.difference(selEntityTab.gridOptions.data, deletableData);
+
+                if (!(_.some($scope.entityTabs[0].gridOptions.data, 'errorText'))) {
+                    delete $scope.entityTabs[0].inactiveErrorStyle;
+                    delete $scope.entityTabs[0].activeErrorStyle;
+                }
+            }
+        };
+
+        $scope.triggerDuplicate = function () {
+            var selectedTab = $scope.getSelectedTabId();
+            var selEntityTab = _.find($scope.entityTabs, function (entityTab) {
+                return entityTab.name.toLowerCase() === selectedTab.toLowerCase();
+            });
+            if ($scope.gridApis[selEntityTab.name]) {
+                var index = _.findIndex($scope.entityTabs, function (row) {
+                    return row.name.toLowerCase() === selectedTab.toLowerCase();
+                });
+                var data = $scope.entityTabs[index].gridOptions.data;
+                var selectedData = JSON.parse(JSON.stringify($scope.gridApis[selEntityTab.name].selection.getSelectedRows())); // to avoid reference
+                var selectedRowIndex = _.findIndex(data, function (item) {
+                    return item.$$hashKey === selectedData[selectedData.length - 1].$$hashKey;
+                });
+                for (var i = 0; i < selectedData.length; i++) {
+                    delete selectedData[i].$$hashKey;
+                    data.splice(selectedRowIndex + i + 1, 0, selectedData[i]);
+                }
+            }
+        };
+
+        $scope.getSelectedTabId = function () {
+            return $scope.tab.active;
+        };
+
+        $scope.isActiveTab = function (tabKey) {
+            return tabKey === $scope.currentEntityTab.key;
+        };
+
+        /*** Key Event Handlers START ****************/
+
+        function directionIncement(gridRows, keyCode, indexAt) {
+            var nextRow;
+            switch (keyCode) {
+                case 40:
+                    nextRow = gridRows[++indexAt.index];
+                    break;
+                case 38:
+                    nextRow = gridRows[--indexAt.index];
+                    break;
+            }
+            return nextRow;
+        }
+
+        $scope.onKeyUp = function ($event) {
+            if ($event.shiftKey) {
+                if (!$scope.lastSelectedRow) {
+                    return;
+                }
+                var gridRows = $scope.gridApis[$scope.getSelectedTabId()].grid.rows;
+                var indexAt = {
+                    index: _.findIndex(gridRows, function (item) {
+                        return item.entity.$$hashKey === $scope.lastSelectedRow.entity.$$hashKey;
+                    })
+                };
+                var nextRow = directionIncement(gridRows, $event.keyCode, indexAt);
+                if (nextRow) {
+                    if (nextRow.isSelected) {
+                        // find next unselected Row
+                        while (nextRow && nextRow.isSelected) {
+                            nextRow = directionIncement(gridRows, $event.keyCode, indexAt);
+                        }
+                        if (nextRow) {
+                            $scope.gridApis[$scope.getSelectedTabId()].selection.selectRow(nextRow.entity);
+                        }
+                    }
+                    else {
+                        $scope.gridApis[$scope.getSelectedTabId()].selection.selectRow(nextRow.entity);
+                    }
+                }
+
+            }
+
+        };
+
+        $scope.isSelected = function (tabName) {
+            if (tabName.toLowerCase() === $scope.tab.active.toLowerCase()) {
+                return true;
+            }
+            return false;
+        };
+
+        $scope.okBtnClicked = function () {
+            $scope.triggerSave();
+            return false; // return false to avoid dialog close
+        };
+        /*** Key Event Handlers END ***************/
+        // Trigger Editor dialog on load of Controller
+        if ($rootScope.loadSDEDitor) {
+            $rootScope.loadSDEDitor = false;
+            $scope.getEntityNavDataForProj($rootScope.sampleData.id, $rootScope.sampleData.entityName);
+        }
+        this.sampleDataControllerSafe = true;
     }
 ];
