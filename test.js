@@ -55,8 +55,8 @@ UICatalogService.prototype.initializeSchema = function(done) {
     promises.push(Promise.resolve(self.extractLibrary()));
 
     Promise.waitAll(promises)
-        .catch(function (err) {
-            var error =  new NormanError('Failed to initialize Schema', err);
+        .catch(function(err) {
+            var error = new NormanError('Failed to initialize Schema', err);
             serviceLogger.error(error);
             throw error;
         })
@@ -107,8 +107,7 @@ UICatalogService.prototype.getSampleTemplates = function() {
     }, function(err, catalogs) {
         if (err) {
             deferred.reject(err);
-        }
-        else {
+        } else {
             deferred.resolve(catalogs);
         }
     });
@@ -123,30 +122,24 @@ UICatalogService.prototype.getSampleTemplates = function() {
 UICatalogService.prototype.updateCustomCatalog = function(catalog) {
     var deferred = Promise.defer();
     this.model.findOneAndUpdate({
-        $and: [
-            {
+        $and: [{
                 catalogName: catalog.catalogName
-            },
-            {
+            }, {
                 catalogVersion: catalog.catalogVersion
-            },
-            {
+            }, {
                 rootCatalogId: catalog.rootCatalogId
-            }
-        ]
-        // }, catalog, {
+            }]
+            // }, catalog, {
     }, catalog, {
         upsert: true
     }, function(err, ctlog) {
         if (err) {
             //console.log('Error in finding catalog:' + err);
             deferred.reject(err);
-        }
-        else {
+        } else {
             if (ctlog) {
                 deferred.resolve(ctlog);
-            }
-            else {
+            } else {
                 deferred.reject('Catalog not found');
             }
         }
@@ -189,30 +182,24 @@ UICatalogService.prototype.getCatalogs = function(filter) {
             break;
         case 'default':
             conditions = {
-                '$and': [
-                    {
-                        'isDefault': true
-                    },
-                    {
-                        'floorPlans': {
-                            '$exists': true
-                        }
+                '$and': [{
+                    'isDefault': true
+                }, {
+                    'floorPlans': {
+                        '$exists': true
                     }
-                ]
+                }]
             };
             break;
         case 'floorplan':
             conditions = {
-                '$and': [
-                    {
-                        'isRootCatalog': false
-                    },
-                    {
-                        'floorPlans': {
-                            '$exists': true
-                        }
+                '$and': [{
+                    'isRootCatalog': false
+                }, {
+                    'floorPlans': {
+                        '$exists': true
                     }
-                ]
+                }]
             };
             break;
     }
@@ -222,8 +209,7 @@ UICatalogService.prototype.getCatalogs = function(filter) {
             if (err) {
                 serviceLogger.error(new NormanError(err));
                 return deferred.reject(err);
-            }
-            else {
+            } else {
                 deferred.resolve(self.addCatalogId(catalogs));
             }
         });
@@ -241,8 +227,7 @@ UICatalogService.prototype.addCatalogId = function(catalogs) {
             newArray.push(catalog);
         }
         return newArray;
-    }
-    else {
+    } else {
         catalogs.catalogId = catalogs._id;
         delete catalogs._id;
         return catalogs;
@@ -259,15 +244,14 @@ UICatalogService.prototype.deleteCatalog = function(name, catalogVersion) {
     var deferred = Promise.defer();
     var conditions;
     conditions = {
-        name: name,
+        catalogName: name,
         catalogVersion: catalogVersion
     };
     this.model.find().remove(conditions,
         function(err, catalogs) {
             if (err) {
                 deferred.reject(err);
-            }
-            else {
+            } else {
                 deferred.resolve(catalogs);
             }
         });
@@ -292,20 +276,17 @@ UICatalogService.prototype.createCatalog = function(catalog) {
     }, {}, function(err, catalogs) {
         if (err) {
             deferred.reject(err);
-        }
-        else {
+        } else {
             if (catalogs.length === 0) {
                 // create the catalog,only if the catalog with the specified name and version doesnot exist
                 model.create(catalog, function(error, ctlog) {
                     if (error) {
                         deferred.reject(error);
-                    }
-                    else {
+                    } else {
                         deferred.resolve(ctlog);
                     }
                 });
-            }
-            else {
+            } else {
                 deferred.resolve(catalog);
             }
         }
@@ -321,27 +302,22 @@ UICatalogService.prototype.createCatalog = function(catalog) {
 UICatalogService.prototype.updateCatalog = function(catalog) {
     var deferred = Promise.defer();
     this.model.findOneAndUpdate({
-        $and: [
-            {
+        $and: [{
                 catalogName: catalog.catalogName
-            },
-            {
+            }, {
                 catalogVersion: catalog.catalogVersion
-            }
-        ]
-        // }, catalog, {
+            }]
+            // }, catalog, {
     }, catalog, {
         upsert: true
     }, function(err, ctlog) {
         if (err) {
             //console.log('Error in finding catalog:' + err);
             deferred.reject(err);
-        }
-        else {
+        } else {
             if (ctlog) {
                 deferred.resolve(ctlog);
-            }
-            else {
+            } else {
                 deferred.reject('Catalog not found');
             }
         }
@@ -360,12 +336,10 @@ UICatalogService.prototype.getCatalog = function(name, catalogVersion) {
     this.model.findOne(condition, fields).lean().exec(function(err, catalogs) {
         if (err) {
             deferred.reject(err);
-        }
-        else {
+        } else {
             if (catalogs) {
                 deferred.resolve(self.addCatalogId(catalogs));
-            }
-            else {
+            } else {
                 serviceLogger.error(new NormanError('Catalog not found'));
                 return deferred.reject('Catalog not found');
             }
@@ -396,8 +370,7 @@ UICatalogService.prototype.getActions = function(name) {
         function(err, catalogs) {
             if (err) {
                 deferred.reject(err);
-            }
-            else {
+            } else {
                 deferred.resolve(catalogs);
             }
         });
@@ -416,13 +389,11 @@ UICatalogService.prototype.addActionsToCatalog = function(catalog) {
             displayToUser: true,
             actionFn: '',
             actionId: 'NAVTO',
-            actionParam: [
-                {
-                    paramName: 'routeName',
-                    paramDisplayName: 'Page',
-                    paramType: 'PAGE'
-                }
-            ],
+            actionParam: [{
+                paramName: 'routeName',
+                paramDisplayName: 'Page',
+                paramType: 'PAGE'
+            }],
             name: 'Navigation',
             displayName: 'Navigation'
         }
@@ -447,7 +418,7 @@ UICatalogService.prototype.processSmartTemplates = function(files, libType, libV
         catalog.libraryVersion = libVersion;
         catalog.isRootCatalog = true;
         catalog.libraryURL = '/api/uicatalogs/' + (isPrivate ? 'private' : 'public') + '/uilib/' + libType + '/' + libVersion + '/sap-ui-core.js';
-        catalog.libraryPublicURL = catalog.libraryURL;  // same for the moment
+        catalog.libraryPublicURL = catalog.libraryURL; // same for the moment
         catalog.rootCatalogId = null;
         this.addActionsToCatalog(catalog); // add actions to root catalog
 
@@ -492,17 +463,17 @@ UICatalogService.prototype.getFloorPlanByLibType = function(libraryType) {
     if (libraryType === 'ui5') {
         // look for all types of ui5
         conditions = {
-            $and: [
-                {'$or': [
-                    {'catalogLang': 'openui5'},
-                    {'catalogLang': 'sapui5'}
-                ]},
-                {
-                    'isRootCatalog': false
-                }
-            ]};
-    }
-    else {
+            $and: [{
+                '$or': [{
+                    'catalogLang': 'openui5'
+                }, {
+                    'catalogLang': 'sapui5'
+                }]
+            }, {
+                'isRootCatalog': false
+            }]
+        };
+    } else {
         // look for specific library type
         conditions = {
             catalogLang: libraryType,
@@ -519,8 +490,7 @@ UICatalogService.prototype.getFloorPlanByLibType = function(libraryType) {
         function(err, catalogs) {
             if (err) {
                 deferred.reject(err);
-            }
-            else {
+            } else {
                 deferred.resolve(catalogs);
             }
         });
@@ -592,8 +562,7 @@ UICatalogService.prototype.getCompatibleCatalogs = function(catalogId) {
         function(err, catalogs) {
             if (err) {
                 deferred.reject(err);
-            }
-            else {
+            } else {
                 if (undefined !== catalogs[0]) {
                     if (catalogs[0].rootCatalogId === null) {
                         that.populateRoots(catalogs[0]._id).then(
@@ -604,8 +573,7 @@ UICatalogService.prototype.getCompatibleCatalogs = function(catalogId) {
                                 deferred.reject(err);
                             }
                         );
-                    }
-                    else {
+                    } else {
                         that.populateRoots(catalogs[0].rootCatalogId).then(
                             function(customcatalogs) {
                                 deferred.resolve(that.addCatalogId(customcatalogs));
@@ -615,8 +583,7 @@ UICatalogService.prototype.getCompatibleCatalogs = function(catalogId) {
                             }
                         );
                     }
-                }
-                else {
+                } else {
                     deferred.reject(err);
                 }
             }
@@ -637,8 +604,7 @@ UICatalogService.prototype.updateRootCatalogId = function(rId, cId) {
     this.model.findOneAndUpdate(condition, update, function(err, catalog) {
         if (err) {
             deferred.reject(err);
-        }
-        else {
+        } else {
             deferred.resolve(catalog);
         }
     });
@@ -655,17 +621,16 @@ UICatalogService.prototype.updateMashupIds = function(ui5Id, angularId, htmlId) 
         _id: ui5Id
     };
     var mashupControls = {};
-    if(angularId) {
+    if (angularId) {
         mashupControls[angularId] = 'sap.norman.controls.Angular';
     }
-    if(htmlId) {
+    if (htmlId) {
         mashupControls[htmlId] = 'sap.ui.core.HTML';
     }
     this.model.findOne(condition, function(err, catalog) {
         if (err) {
             deferred.reject(err);
-        }
-        else {
+        } else {
             if (catalog) {
                 catalog.mashupControls = mashupControls;
                 catalog.save();
@@ -686,8 +651,7 @@ UICatalogService.prototype.getCatalogById = function(catalogId) {
         if (err) {
             serviceLogger.error(new NormanError(err));
             return deferred.reject(err);
-        }
-        else {
+        } else {
             deferred.resolve(self.addCatalogId(catalog));
         }
     });
@@ -696,14 +660,16 @@ UICatalogService.prototype.getCatalogById = function(catalogId) {
 
 UICatalogService.prototype.getCatalogsByName = function(catalogNames) {
     var condition = {};
-    if(catalogNames.length !== 0){
-      condition = {
-        catalogName: {$in: catalogNames}
-      };
-    }else{
-      condition = {
-        isDefault:true
-      };
+    if (catalogNames.length !== 0) {
+        condition = {
+            catalogName: {
+                $in: catalogNames
+            }
+        };
+    } else {
+        condition = {
+            isDefault: true
+        };
     }
     return getCatalogsByCondition(this.model, condition);
 };
@@ -712,10 +678,11 @@ UICatalogService.prototype.getCatalogsByIds = function(catalogIds) {
     var condition = {};
     if (catalogIds.length !== 0) {
         condition = {
-            _id: {$in: catalogIds}
+            _id: {
+                $in: catalogIds
+            }
         };
-    }
-    else {
+    } else {
         condition = {
             isDefault: true
         };
@@ -723,18 +690,16 @@ UICatalogService.prototype.getCatalogsByIds = function(catalogIds) {
     return getCatalogsByCondition(this.model, condition);
 };
 
-function getCatalogsByCondition(model, condition){
+function getCatalogsByCondition(model, condition) {
     var deferred = Promise.defer();
-    if (_.isEmpty(condition)  || _.isEmpty(model)) {
+    if (_.isEmpty(condition) || _.isEmpty(model)) {
         deferred.reject('must pass valid model and condition');
-    }
-    else {
-        model.find(condition).lean().exec(function (err, catalogs) {
+    } else {
+        model.find(condition).lean().exec(function(err, catalogs) {
             if (err) {
                 serviceLogger.error(new NormanError(err));
                 return deferred.reject(err);
-            }
-            else {
+            } else {
                 deferred.resolve(catalogs);
             }
         });
@@ -762,8 +727,7 @@ UICatalogService.prototype.populateRoots = function(id) {
         function(err, catalogs) {
             if (err) {
                 deferred.reject(err);
-            }
-            else {
+            } else {
                 if (catalogs[0].rootCatalogId === null) {
                     if (_.keys(catalogs[0].mashupControls)) {
                         rootIds = _.keys(catalogs[0].mashupControls);
@@ -790,8 +754,7 @@ UICatalogService.prototype.populateRoots = function(id) {
                                 if (err) {
                                     serviceLogger.error(new NormanError(err));
                                     return deferred.reject(err);
-                                }
-                                else {
+                                } else {
                                     deferred.resolve(catalogs);
                                 }
                             });
@@ -815,8 +778,7 @@ UICatalogService.prototype.deleteControls = function(catalogName, catalogVersion
         function(err, catalogs) {
             if (err) {
                 deferred.reject(err);
-            }
-            else {
+            } else {
                 for (var itr = 0; itr < controls.length; itr++) {
                     delete catalogs.controls[controls[itr]];
                 }
@@ -840,18 +802,15 @@ UICatalogService.prototype.getAvailableVersions = function(libraryType) {
         groupConditions, matchConditions;
     matchConditions = {
         '$match': {
-            '$and': [
-                {
-                    'metadata.libraryType': {
-                        '$eq': libraryType
-                    }
-                },
-                {
-                    'metadata.forCanvas': {
-                        '$ne': true
-                    }
+            '$and': [{
+                'metadata.libraryType': {
+                    '$eq': libraryType
                 }
-            ]
+            }, {
+                'metadata.forCanvas': {
+                    '$ne': true
+                }
+            }]
         }
     };
     groupConditions = {
@@ -863,45 +822,37 @@ UICatalogService.prototype.getAvailableVersions = function(libraryType) {
         matchConditions,
         groupConditions
     ).exec(function(err, res) {
-            if (err) {
-                deferred.reject(err);
-            }
-            else {
-                deferred.resolve(res);
-            }
-        });
+        if (err) {
+            deferred.reject(err);
+        } else {
+            deferred.resolve(res);
+        }
+    });
     return deferred.promise;
 };
 
 UICatalogService.prototype.getLibraryFile = function(type, version, pathFileName, isPrivate) {
     var deferred = Promise.defer(),
         conditions = {
-            $and: [
-                {
-                    'metadata.libraryType': type
-                },
-                {
-                    'metadata.path': new RegExp(pathFileName + '$', 'i')
-                },
-                {
-                    'metadata.libraryVersion': version
-                },
-                {
-                    'metadata.isPrivate': isPrivate
-                }
-            ]
+            $and: [{
+                'metadata.libraryType': type
+            }, {
+                'metadata.path': new RegExp(pathFileName + '$', 'i')
+            }, {
+                'metadata.libraryVersion': version
+            }, {
+                'metadata.isPrivate': isPrivate
+            }]
         };
     getGridModel().findOne(conditions).lean().exec(function(err, file) {
         if (err) {
             deferred.reject(err);
-        }
-        else {
+        } else {
             if (file === null) {
                 //serviceLogger.error(new NormanError(err));
                 deferred.reject('file not found: ' + pathFileName);
                 return deferred.promise;
-            }
-            else {
+            } else {
                 var readStream = commonService.getGridFs().createReadStream({
                     _id: file._id,
                     root: 'library'
@@ -946,32 +897,25 @@ UICatalogService.prototype.getLibraryFileString = function (fileName, libType, l
 UICatalogService.prototype.getMetadataGeneratorFiles = function(type, version, pathFileName) {
     var deferred = Promise.defer(),
         conditions = {
-            $and: [
-                {
-                    'metadata.libraryType': type
-                },
-                {
-                    'metadata.path': new RegExp(pathFileName + '$', 'i')
-                },
-                {
-                    'metadata.libraryVersion': version
-                },
-                {
-                    'metadata.forCanvas': true
-                }
-            ]
+            $and: [{
+                'metadata.libraryType': type
+            }, {
+                'metadata.path': new RegExp(pathFileName + '$', 'i')
+            }, {
+                'metadata.libraryVersion': version
+            }, {
+                'metadata.forCanvas': true
+            }]
         };
     getGridModel().findOne(conditions).lean().exec(function(err, file) {
         if (err) {
             deferred.reject(err);
-        }
-        else {
+        } else {
             if (file === null) {
                 serviceLogger.error(new NormanError(err));
                 deferred.reject('file not found: ' + pathFileName);
                 return deferred.promise;
-            }
-            else {
+            } else {
                 var readStream = commonService.getGridFs().createReadStream({
                     _id: file._id,
                     root: 'library'
@@ -1014,8 +958,7 @@ UICatalogService.prototype.getFiles = function(fileNames) {
         fs.readFile(fullPath, 'utf8', function(err, data) {
             if (err) {
                 deferred.reject(err);
-            }
-            else {
+            } else {
                 deferred.resolve(data);
             }
         });
@@ -1025,8 +968,7 @@ UICatalogService.prototype.getFiles = function(fileNames) {
         .then(function(files) {
             if (files && files.length === fileNames.length) {
                 return Promise.resolve(files);
-            }
-            else {
+            } else {
                 return Promise.reject('not all files could be loaded');
             }
         });
@@ -1086,11 +1028,9 @@ UICatalogService.prototype.initializeDb = function(callback) {
                 var rootCatalogId = rootCatalog._id;
                 if (rootCatalogFileName === 'r4ui5.json') {
                     ui5Id = rootCatalogId;
-                }
-                else if (rootCatalogFileName === 'r2angular.json') {
+                } else if (rootCatalogFileName === 'r2angular.json') {
                     angularId = rootCatalogId;
-                }
-                else if (rootCatalogFileName === 'r3html.json') {
+                } else if (rootCatalogFileName === 'r3html.json') {
                     htmlId = rootCatalogId;
                 }
                 return that.checkForData(rootCatalog, customCatalogs);
@@ -1233,10 +1173,10 @@ UICatalogService.prototype.initializeLibrary = function() {
 };
 
 UICatalogService.prototype.readAndGenerateZip = function() {
- var fileName = 'openui5-runtime-1.26.6.zip';
- var filePath = '../../api/catalog/sampleTemplate/';
- var zipfile = path.join(__dirname, filePath + fileName);
- return zipfile;
+    var fileName = 'openui5-runtime-1.26.6.zip';
+    var filePath = '../../api/catalog/sampleTemplate/';
+    var zipfile = path.join(__dirname, filePath + fileName);
+    return zipfile;
 };
 
 UICatalogService.prototype.extractLibrary = function(callback) {
@@ -1292,8 +1232,7 @@ UICatalogService.prototype.extractLibrary = function(callback) {
         .then(function(fileNames) {
             if (fileNames && fileNames.length === files.length) {
                 callback(null, fileNames);
-            }
-            else {
+            } else {
                 callback(null, 'not all files could be loaded');
             }
         });
@@ -1348,83 +1287,140 @@ UICatalogService.prototype.storeNewFileFromStream = function(fileName, isDirecto
     return deferred.promise;
 };
 
-UICatalogService.prototype.importCatalog= function(file) {
+UICatalogService.prototype.importCatalog = function(file) {
     var defPromise = Promise.defer();
     var self = this;
     var buffer;
-    var jsonContent={};
-    var mimetype=file[0].mimetype;
-    switch( mimetype ){
-      case 'application/json':
-        buffer = new Buffer(file[0].buffer);
-      jsonContent= JSON.parse(buffer.toString('utf8'));
-      self.createCatalog(jsonContent).then(
-        function(result){
-          defPromise.resolve(result);
-        },function(err){
-          defPromise.reject(err);
-        }
-      );
-      break;
-      case 'application/zip':
-        self.readContentOfImportZip(file).then(
-          function(result){
-            defPromise.resolve(result);
-          },function(err){
-            defPromise.reject(err);
-          }
-      );
-      break;
-      default:
-        defPromise.reject('only json file and zip file are allowed');
+    var jsonContent = {};
+    var mimetype = file[0].mimetype;
+    switch (mimetype) {
+        case 'application/json':
+            buffer = new Buffer(file[0].buffer);
+            jsonContent = JSON.parse(buffer.toString('utf8'));
+            self.createCatalog(jsonContent).then(
+                function(result) {
+                    defPromise.resolve(result);
+                }, function(err) {
+                    defPromise.reject(err);
+                }
+            );
+            break;
+        case 'application/zip':
+            self.readContentOfImportZip(file).then(
+                function(result) {
+                    defPromise.resolve(result);
+                }, function(err) {
+                    defPromise.reject(err);
+                }
+            );
+            break;
+        default:
+            defPromise.reject('only json file and zip file are allowed');
     }
     return defPromise.promise;
 };
 
 UICatalogService.prototype.readContentOfImportZip = function(zipFile) {
-  var self = this;
-  var deferred = Promise.defer();
-  var zip = new JSZip(zipFile[0].buffer);
-  if (_.isEmpty(zip.files)) {
-    return deferred.reject('no files to load');
-  }
-  var zipFilePromises = _.map(zip.files, function(zipEntry) {
-    var defPromise = Promise.defer();
-    var fileName = zipEntry.name;
-    var match,content,objectid;
-    // catch the file name
-    var regex = new RegExp('[^/]+$');
-    try{
-      if (!zipEntry.dir && !endsWith(zipEntry.name, '/')) {
-        match = regex.exec(zipEntry.name);
-        // file name extracted
-        fileName = match[0];
-        // file content extracted as text
-        content=JSON.parse(zipEntry.asText());
-        //create the catalog from the json content of the file
-        self.createCatalog(content).then(
-          function(result){
-            defPromise.resolve(fileName);
-          },function(err){
-            defPromise.reject(err);
-          }
-        );
-      }
-    }catch(err){
-      return defPromise.reject(err);
+    var self = this;
+    var deferred = Promise.defer();
+    var zip = new JSZip(zipFile[0].buffer);
+    if (_.isEmpty(zip.files)) {
+        return deferred.reject('no files to load');
     }
-    return defPromise.promise;
-  });
+    var zipFilePromises = _.map(zip.files, function(zipEntry) {
+        var defPromise = Promise.defer();
+        var fileName = zipEntry.name;
+        var match, content, objectid;
+        // catch the file name
+        var regex = new RegExp('[^/]+$');
+        try {
+            if (!zipEntry.dir && !endsWith(zipEntry.name, '/')) {
+                match = regex.exec(zipEntry.name);
+                // file name extracted
+                fileName = match[0];
+                // file content extracted as text
+                content = JSON.parse(zipEntry.asText());
+                //create the catalog from the json content of the file
+                self.createCatalog(content).then(
+                    function(result) {
+                        defPromise.resolve(fileName);
+                    }, function(err) {
+                        defPromise.reject(err);
+                    }
+                );
+            }
+        } catch (err) {
+            return defPromise.reject(err);
+        }
+        return defPromise.promise;
+    });
 
-  return Promise.all(zipFilePromises)
-  .then(function(files) {
-    if (files && files.length === Object.keys(zip.files).length) {
-      return Promise.resolve(files);
+    return Promise.all(zipFilePromises)
+        .then(function(files) {
+            if (files && files.length === Object.keys(zip.files).length) {
+                return Promise.resolve(files);
+            } else {
+                return Promise.reject('not all files could be loaded');
+            }
+        });
+};
+UICatalogService.prototype.upgradeSchema = function(version, done) {
+    logger.debug('upgradeSchema for UICatalogManager');
+    var job = Promise.resolve(true);
+    var self = this;
+    logger.debug('upgradeSchema version is:', version);
+    switch (version.minor) {
+        case 0:
+            job = job.then(self.upgrade_0_1_0());
     }
-    else {
-      return Promise.reject('not all files could be loaded');
-    }
+    return job.callback(done);
+};
+UICatalogService.prototype.upgrade_0_1_0 = function () {
+  logger.debug('Running upgrade_0_1_0 for UICatalogManager');
+  var fileNames = ['r4ui5.json', 'r4c1ui5.json'],
+  filePath = '../../api/catalog/sampleTemplate/',
+  self = this,
+  deferred = Promise.defer(),
+  fileInfo = [],
+  filesUnused = ['openui5r1-1_0', 'r1c1ui5-1_0', 'r1c2ui5-1_0', 'r2angular-0.1', 'r2c1angular-0.1', 'r3html-0.1', 'r3c1html-0.1'];
+  // 1) As part of migration, overwrite the r4 catalogs with the latest data.
+  var fileUpdate = _.map(fileNames, function(fileName) {
+    var fullPath = path.join(__dirname, filePath + fileName);
+    fs.readFile(fullPath, 'utf8', function(error, data) {
+      if (error) {
+        deferred.reject(error);
+      } else {
+        data = JSON.parse(data);
+        delete data.rootCatalogId;
+        self.updateCatalog(data).then(
+          function(catalogs){
+            deferred.resolve(catalogs);
+          }, function(err){
+            deferred.reject(err);
+          });
+      }
+    });
   });
+  // 2) As part of migration, remove the catalogs that are not loaded as part of beta3
+  var fileRemoval = _.map(filesUnused, function (fileData){
+    fileInfo = fileData.split('-');
+    // feed in the catalogName and catalogVersion of the files to be removed
+    self.deleteCatalog(fileInfo[0], fileInfo[1]).then(
+      function(catalogs){
+        deferred.resolve(catalogs);
+      }, function(err){
+        deferred.reject(err);
+      });
+  });
+  Promise.all([fileUpdate, fileRemoval])
+  .then(function(files){
+    if (files) {
+      return deferred.resolve(files);
+    }
+  }).catch(function (err) {
+    deferred.reject('could not resolve all promises', err);
+  });
+  return deferred.promise;
 };
 
 UICatalogService.prototype.storeNewFileFromString = function(fileName, fileContent, libType, libVersion, isPrivate) {
